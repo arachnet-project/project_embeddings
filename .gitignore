@@ -1,0 +1,46 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# The unofficial docs
+docs/aux
+
+# Rsync control file, not needed with github
+syn.sh
+
+# Virtual environments
+venv/
+env/
+*.egg-info/
+*.egg
+
+# Logs
+*.log
+
+# Environment variables / secrets
+.env
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Documentation build
+docs/_build/
+docs/.DS_Store
+
+# Misc
+*.bak
+*.tmp

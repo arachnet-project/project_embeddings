@@ -1,0 +1,210 @@
+# database.yaml
+# Database connection configuration for Arachnet Clinical Embeddings.
+# Merged by config_loader.py as cfg.database sub-tree.
+# Never store actual passwords here — reference environment variables only.
+# TNS_ADMIN environment variable must be set before any script runs.
+# Last modified: 2026-03-26
+
+metadata:
+  created_by: "Jan Mura"
+  created_on: "2026-03-21"
+  config_version: "1.3"
+  last_modified: "2026-03-26"
+
+database:
+
+  # ---------------------------------------------------------------------------
+  # TNS configuration
+  # TNS_ADMIN is read from the environment variable — not set here.
+  # tnsnames.ora and sqlnet.ora must exist at $TNS_ADMIN.
+  # ---------------------------------------------------------------------------
+  tns_alias: "ARADB"              # REQUIRED — must match alias in tnsnames.ora
+
+  # ---------------------------------------------------------------------------
+  # Production schema — active, validated SNOMED CT data
+  # ---------------------------------------------------------------------------
+  production_schema:
+    user: "snomed"                # REQUIRED
+    password_env_var: "SNOMED_DB_PASSWORD"      # REQUIRED — env var must be set at runtime
+    tablespace: "TBS_SNOMED"      # REQUIRED — must exist before first load
+    temp_tablespace: "TEMP"       # REQUIRED
+
+  # ---------------------------------------------------------------------------
+  # Stage schema — ingestion and validation target before swap
+  # ---------------------------------------------------------------------------
+  stage_schema:
+    user: "snomed_stage"          # REQUIRED
+    password_env_var: "SNOMED_STAGE_DB_PASSWORD"  # REQUIRED — env var must be set at runtime
+    tablespace: "TBS_SNOMED_STAGE" # REQUIRED — must exist before first load
+    temp_tablespace: "TEMP"        # REQUIRED
+
+  # ---------------------------------------------------------------------------
+  # Admin credentials — DBA-level, used only during initial schema setup.
+  # Never used during normal ingestion or query operations.
+  # ---------------------------------------------------------------------------
+  admin:
+    user: "system"                # REQUIRED for initial setup only
+    password_env_var: "SNOMED_ADMIN_DB_PASSWORD"  # REQUIRED for initial setup only
+
+  # ---------------------------------------------------------------------------
+  # Connection pool
+  #
+  # IMPORTANT: These are provisional placeholder values only.
+  # Pool parameters must be reviewed and tuned before Phase 4 (Query Layer)
+  # is implemented. Do not treat these numbers as authoritative.
+  #
+  # When pooling is relevant:
+  #   Phase 1 ingestion  — does NOT use pool. Uses a direct dedicated
+  #                         connection per schema for bulk load operations.
+  #   Phase 3 embeddings — may use pool if batch vectorisation is
+  #                         parallelised across worker threads.
+  #   Phase 4 query layer — primary use case for pooling. Tune min/max
+  #                         based on measured concurrency and OCI instance
+  #                         memory at implementation time.
+  #
+  # Parameters to revisit at Phase 4:
+  #   min_connections — keep low; idle connections consume Oracle session memory
+  #   max_connections — depends on concurrent query load and DB instance limits
+  #   timeout         — oracledb thin client timeout semantics differ from thick;
+  #                     verify behaviour before finalising
+  # ---------------------------------------------------------------------------
+  pool:
+    min_connections: 2
+    max_connections: 10
+    increment: 1
+    timeout: 30                   # seconds — idle connection timeout
+                                  # PROVISIONAL — tune at Phase 4
+
+  # ---------------------------------------------------------------------------
+  # Table registry — Option C
+  #
+  # Each entry defines: Oracle table name, schema ownership, source RF2 folder,
+  # RF2 filename pattern (* = release date placeholder YYYYMMDD), description.
+  #
+  # Full DDL (columns, types, constraints, indexes) lives in sql/ddl/.
+  # Oracle ALL_TAB_COLUMNS is the runtime authoritative source for column info.
+  #
+  # schema: "production" means the table is owned by the snomed schema.
+  # The stage schema (snomed_stage) mirrors all tables identically during
+  # ingestion. The stage mirror is implicit — not listed separately here.
+  #
+  # rf2_file_pattern: ingestion scripts glob-expand against actual files on
+  # disk. Multiple files matching the same pattern (e.g. multiple simple map
+  # instantiations) are all loaded into the same table.
+  #
+  # All four fields (table, schema, rf2_folder, rf2_file_pattern) are REQUIRED
+  # for every table entry. description is optional but strongly recommended.
+  # ---------------------------------------------------------------------------
+  tables:                         # REQUIRED — must contain at least one entry
+
+    # --- Core components ------------------------------------------------------
+
+    - table: "sct_concept"                        # REQUIRED
+      schema: "production"                        # REQUIRED
+      rf2_folder: "Terminology"                   # REQUIRED
+      rf2_file_pattern: "sct2_Concept_Snapshot_INT_*.txt"  # REQUIRED
+      description: "SNOMED CT concepts — one row per concept"
+
+    - table: "sct_description"
+      schema: "production"
+      rf2_folder: "Terminology"
+      rf2_file_pattern: "sct2_Description_Snapshot-en_INT_*.txt"
+      description: "Descriptions (FSN and Synonym) linked to concepts"
+
+    - table: "sct_text_definition"
+      schema: "production"
+      rf2_folder: "Terminology"
+      rf2_file_pattern: "sct2_TextDefinition_Snapshot-en_INT_*.txt"
+      description: "Formal text definitions — semantically rich, used in Phase 3 embeddings"
+
+    - table: "sct_relationship"
+      schema: "production"
+      rf2_folder: "Terminology"
+      rf2_file_pattern: "sct2_Relationship_Snapshot_INT_*.txt"
+      description: "Stated and inferred IS-A and attribute relationships"
+
+    - table: "sct_relationship_concrete"
+      schema: "production"
+      rf2_folder: "Terminology"
+      rf2_file_pattern: "sct2_RelationshipConcreteValues_Snapshot_INT_*.txt"
+      description: "Concrete domain relationship values (OWL EL profile)"
+
+    - table: "sct_identifier"
+      schema: "production"
+      rf2_folder: "Terminology"
+      rf2_file_pattern: "sct2_Identifier_Snapshot_INT_*.txt"
+      description: "Alternative identifiers for SNOMED CT components"
+
+    # --- Reference sets — Language --------------------------------------------
+
+    - table: "sct_refset_language"
+      schema: "production"
+      rf2_folder: "Refset/Language"
+      rf2_file_pattern: "der2_cRefset_LanguageSnapshot-en_INT_*.txt"
+      description: "Language acceptability for descriptions (preferred / acceptable)"
+
+    # --- Reference sets — Content ---------------------------------------------
+
+    - table: "sct_refset_simple"
+      schema: "production"
+      rf2_folder: "Refset/Content"
+      rf2_file_pattern: "der2_Refset_SimpleSnapshot_INT_*.txt"
+      description: "Simple reference sets — concept membership, all instantiations combined"
+
+    - table: "sct_refset_association"
+      schema: "production"
+      rf2_folder: "Refset/Content"
+      rf2_file_pattern: "der2_cRefset_AssociationSnapshot_INT_*.txt"
+      description: "Association reference sets — historical associations between concepts"
+
+    - table: "sct_refset_attribute_value"
+      schema: "production"
+      rf2_folder: "Refset/Content"
+      rf2_file_pattern: "der2_cRefset_AttributeValueSnapshot_INT_*.txt"
+      description: "Attribute value reference sets — inactivation indicators and similar"
+
+    # --- Reference sets — Map -------------------------------------------------
+
+    - table: "sct_refset_simple_map"
+      schema: "production"
+      rf2_folder: "Refset/Map"
+      rf2_file_pattern: "der2_sRefset_SimpleMapSnapshot_INT_*.txt"
+      description: "Simple maps to external code systems — all instantiations combined"
+
+    - table: "sct_refset_extended_map"
+      schema: "production"
+      rf2_folder: "Refset/Map"
+      rf2_file_pattern: "der2_iisssccRefset_ExtendedMapSnapshot_INT_*.txt"
+      description: "Extended maps — primarily SNOMED CT to ICD-10 WHO 2016"
+
+    # --- Reference sets — Metadata / OWL -------------------------------------
+
+    - table: "sct_refset_owl_expression"
+      schema: "production"
+      rf2_folder: "Refset/Metadata"
+      rf2_file_pattern: "sct2_sRefset_OWLExpressionSnapshot_INT_*.txt"
+      description: "OWL axiom expressions for description logic classification"
+
+    - table: "sct_refset_mrcm_domain"
+      schema: "production"
+      rf2_folder: "Refset/Metadata"
+      rf2_file_pattern: "der2_ssccRefset_MRCMDomainSnapshot_INT_*.txt"
+      description: "MRCM domain constraints — concept model rules per domain"
+
+    - table: "sct_refset_mrcm_attribute_domain"
+      schema: "production"
+      rf2_folder: "Refset/Metadata"
+      rf2_file_pattern: "der2_cissccRefset_MRCMAttributeDomainSnapshot_INT_*.txt"
+      description: "MRCM attribute domain — which attributes apply per domain"
+
+    - table: "sct_refset_mrcm_attribute_range"
+      schema: "production"
+      rf2_folder: "Refset/Metadata"
+      rf2_file_pattern: "der2_ssccRefset_MRCMAttributeRangeSnapshot_INT_*.txt"
+      description: "MRCM attribute range — permitted value constraints per attribute"
+
+    - table: "sct_refset_mrcm_module_scope"
+      schema: "production"
+      rf2_folder: "Refset/Metadata"
+      rf2_file_pattern: "der2_cRefset_MRCMModuleScopeSnapshot_INT_*.txt"
+      description: "MRCM module scope — which modules the MRCM rules apply to"

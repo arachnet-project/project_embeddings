@@ -1,0 +1,164 @@
+# ingestion.yaml
+# Phase 1 — RF2 ingestion pipeline configuration.
+# Merged by config_loader.py as cfg.ingestion sub-tree.
+# Paths are resolved via project.yaml environment definitions.
+# Table load sequence is derived from database.yaml tables list order.
+# Last modified: 2026-03-26
+
+metadata:
+  created_by: "Jan Mura"
+  created_on: "2026-03-24"
+  config_version: "1.3"
+  last_modified: "2026-03-26"
+
+ingestion:
+
+  # ---------------------------------------------------------------------------
+  # Release settings
+  # ---------------------------------------------------------------------------
+  release:
+    release_type: "Snapshot"            # REQUIRED — Snapshot | Full | Delta
+    release_date_source: "project.yaml" # REQUIRED — authoritative date is project.data_release
+    encoding: "utf-8"                   # REQUIRED
+    delimiter: "\t"                     # REQUIRED — RF2 files are tab-delimited
+    skip_header: true                   # REQUIRED — first row of every RF2 file is a header
+    allow_empty_files: true             # some refset files ship with header only — not an error
+
+  # ---------------------------------------------------------------------------
+  # Load behaviour
+  # ---------------------------------------------------------------------------
+  load:
+    batch_size: 10000                   # REQUIRED
+    append_hint: true
+    truncate_before_load: true          # REQUIRED
+    commit_frequency: 0                 # REQUIRED — 0 = commit once at end of table load
+    stop_on_error: true                 # REQUIRED — must be true in production
+
+  # ---------------------------------------------------------------------------
+  # Table load sequence
+  # Derived from database.yaml tables list order — no separate list here.
+  # In production skip_tables must always be empty.
+  # ---------------------------------------------------------------------------
+  skip_tables: []                       # e.g. [sct_refset_extended_map, sct_identifier]
+
+  # ---------------------------------------------------------------------------
+  # National extensions — placeholder, currently disabled
+  # ---------------------------------------------------------------------------
+  national_extensions:
+    enabled: false                      # REQUIRED
+    extensions: []
+    # Example structure for when extensions are configured:
+    # extensions:
+    #   - name: "Czech National Extension"
+    #     language_code: "cs"
+    #     module_id: ""               # to be confirmed with UZIS
+    #     language_refset_id: ""      # to be confirmed with UZIS
+    #     rf2_folder: ""              # path under data_volume
+    #     files: []
+    #   - name: "Slovak National Extension"
+    #     language_code: "sk"
+    #     module_id: ""
+    #     language_refset_id: ""
+    #     rf2_folder: ""
+    #     files: []
+
+  # ---------------------------------------------------------------------------
+  # Validation
+  # Three-layer validation runs after load, before schema swap.
+  # Layer 1: RF2-to-table row count equality — implemented in loader code.
+  # Layer 2: Minimum row count floors — secondary backstop, configured below.
+  # Layer 3: Referential integrity — SQL checks, configured below.
+  # ---------------------------------------------------------------------------
+  validation:
+    enabled: true                       # REQUIRED
+    abort_on_blocking_failure: true     # REQUIRED — must be true in production
+
+    checks:
+
+      - check: "min_row_count"          # REQUIRED
+        mode: "blocking"                # REQUIRED
+        tables:
+          sct_concept:                350000
+          sct_description:            900000
+          sct_text_definition:        0
+          sct_relationship:           1500000
+          sct_relationship_concrete:  0
+          sct_identifier:             0
+          sct_refset_language:        900000
+          sct_refset_simple:          1000
+          sct_refset_association:     50000
+          sct_refset_attribute_value: 100000
+          sct_refset_simple_map:      1000
+          sct_refset_extended_map:    100000
+          sct_refset_owl_expression:  300000
+          sct_refset_mrcm_domain:     10
+          sct_refset_mrcm_attribute_domain: 100
+          sct_refset_mrcm_attribute_range:  100
+          sct_refset_mrcm_module_scope:     1
+
+      - check: "all_tables_loaded"
+        mode: "blocking"
+
+      - check: "no_unexpected_empty_tables"
+        mode: "blocking"
+
+      - check: "referential_integrity"
+        mode: "advisory"                # promote to blocking after first successful load
+        rules:
+          - child_table: "sct_description"
+            child_column: "conceptId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_text_definition"
+            child_column: "conceptId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_relationship"
+            child_column: "sourceId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_relationship"
+            child_column: "destinationId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_relationship"
+            child_column: "typeId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_refset_language"
+            child_column: "referencedComponentId"
+            parent_table: "sct_description"
+            parent_column: "id"
+          - child_table: "sct_refset_owl_expression"
+            child_column: "referencedComponentId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_refset_attribute_value"
+            child_column: "valueId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+          - child_table: "sct_refset_association"
+            child_column: "targetComponentId"
+            parent_table: "sct_concept"
+            parent_column: "id"
+
+  # ---------------------------------------------------------------------------
+  # Stage-to-production swap
+  # Runs only after all blocking validation checks pass.
+  # ---------------------------------------------------------------------------
+  swap:
+    strategy: "rename"                  # REQUIRED
+    previous_schema_action: "keep"      # REQUIRED — keep | drop
+    previous_schema_name: "snomed_previous"  # REQUIRED
+
+  # ---------------------------------------------------------------------------
+  # Logging and load manifest
+  # ---------------------------------------------------------------------------
+  logging:
+    level: "INFO"                       # REQUIRED — DEBUG | INFO | WARNING | ERROR
+    manifest_target: "file"             # REQUIRED — file | table | both
+    manifest_filename: "load_manifest_{data_release}.json"  # REQUIRED
+    include_row_counts: true
+    include_rf2_source_counts: true
+    include_durations: true
+    include_validation_detail: true

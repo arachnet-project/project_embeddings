@@ -1,0 +1,83 @@
+# project.yaml
+# Global, phase-independent project configuration.
+# Loaded by config_loader.py before any phase script executes.
+# Uses OmegaConf for variable interpolation.
+# Last modified: 2026-03-26
+
+active_environment: "production"    # REQUIRED — Switch to "dev" for local development
+
+metadata:
+  created_by: "Jan Mura"
+  created_on: "2026-03-21"
+  config_version: "1.1"
+  last_modified: "2026-03-23"
+
+project:
+  name: "Arachnet Clinical Embeddings"  # REQUIRED
+  software_version: "0.1"               # Incremented on each code release
+  data_release: "20260101"              # REQUIRED — SNOMED CT RF2 snapshot date, format YYYYMMDD
+  owner: "Arachnet Project z.s."
+  snomed_notice: "This material includes SNOMED Clinical Terms (SNOMED CT) which
+    is used by permission of SNOMED International. SNOMED and SNOMED CT are
+    registered trademarks of SNOMED International."  # REQUIRED — must appear in all outputs
+
+environments:
+  production:
+    # OCI Frankfurt — Oracle Linux 9 compute instance
+    paths:
+      base: "/home/opc/project_embeddings"           # REQUIRED
+      config: "${environments.production.paths.base}/config"
+      src: "${environments.production.paths.base}/src"
+      scripts: "${environments.production.paths.base}/scripts"
+      docs: "${environments.production.paths.base}/docs"
+      log: "${environments.production.paths.base}/log" # REQUIRED — logging fails without this
+      venv: "${environments.production.paths.base}/venv"
+      python: "${environments.production.paths.venv}/bin/python"
+      # Data paths — separately attached OCI block volume
+      data_volume: "/mnt/snomed_data"                # REQUIRED
+      rf2: "${environments.production.paths.data_volume}/rf2"   # REQUIRED
+      parquet: "${environments.production.paths.data_volume}/parquet" # REQUIRED
+
+  dev:
+    # Local development — MacBook Pro M1 (primary)
+    paths:
+      base: "/Users/jan/arachnet/snomed/project_embeddings"     # REQUIRED
+      config: "${environments.dev.paths.base}/config"
+      src: "${environments.dev.paths.base}/src"
+      scripts: "${environments.dev.paths.base}/scripts"
+      docs: "${environments.dev.paths.base}/docs"
+      log: "${environments.dev.paths.base}/log"       # REQUIRED
+      venv: "${environments.dev.paths.base}/venv"
+      python: "${environments.dev.paths.venv}/bin/python"
+      # On dev machines data lives under the project root, no separate volume
+      data_volume: "${environments.dev.paths.base}/data"        # REQUIRED
+      rf2: "${environments.dev.paths.data_volume}/rf2"          # REQUIRED
+      parquet: "${environments.dev.paths.data_volume}/parquet"  # REQUIRED
+
+infrastructure:
+  production:
+    description: "OCI Frankfurt — primary production environment"
+    host_type: "OCI VM"
+    os: "Oracle Linux 9"
+    db: "Oracle Database 23ai"
+    region: "eu-frankfurt-1"
+    data_volume_mount: "/mnt/snomed_data"
+  dev:
+    primary:
+      description: "MacBook Pro M1 — primary development machine"
+      os: "macOS"
+    secondary:
+      description: "MacBook Air Intel — secondary development machine"
+      os: "Ubuntu"                  # Being configured, connectivity pending
+
+includes:                           # REQUIRED — config loader will not know what to merge without this
+  # Phase-specific config files, loaded and merged by config_loader.py
+  # Each becomes a named sub-tree: cfg.database, cfg.ingestion
+  - database.yaml
+  - ingestion.yaml
+
+governance:
+  license: "SNOMED International Affiliate"  # REQUIRED
+  affiliate_administrator: "UZIS"
+  data_handling: "no-redistribution-of-raw-terminology"
+  # Full compliance details in docs/infrastructure.md
