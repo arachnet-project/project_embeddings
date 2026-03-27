@@ -1,0 +1,108 @@
+## Arachnet Clinical Embeddings — Project Summary
+
+**Owner:** Jan Mura, Arachnet Project z.s.  
+**Date started:** March 2026  
+**Summary last updated:** 2026-03-26
+
+### What the project is
+
+A clinical terminology embedding platform built on Oracle 23ai in OCI Frankfurt. It ingests SNOMED CT international release RF2 files, builds a structured database, and produces domain-aware vector embeddings combining text, graph/ontology structure, and policy-weighted relationships. The embedding model is custom — not a generic pretrained model — and is parameterised by clinical domain (clinics, health insurance, etc.).
+
+The project uses SNOMED CT under an affiliate licence administered by UZIS (Czech national SNOMED administrator). The product name deliberately avoids the SNOMED trademark. The required SNOMED CT attribution notice is stored in `project.yaml` under `project.snomed_notice` and must appear in all distributed outputs.
+
+### Infrastructure
+
+Production: OCI Frankfurt, Oracle Linux 9, Oracle Database 23ai. Project root: `/home/opc/project_embeddings`. Data volume (separate OCI block volume): `/mnt/snomed_data`.
+
+Dev primary: MacBook Pro M1, macOS, VoiceOver + Terminal + Vim. Project root: `/Users/jan/arachnet/snomed/project_embeddings`.
+
+Dev secondary: MacBook Air Intel, Ubuntu being configured, Orca + Vim.
+
+Possible addition: Mac Studio M4 Max 64GB — planned for Phase 3 ML/embedding work.
+
+Jan is blind and works via SSH terminal using VoiceOver (macOS) or Orca (Ubuntu).
+
+Python virtual environment: `venv/` directly under project root on all machines. Python 3.12. Activated automatically via `.bashrc`. Editor: Vim.
+
+Code repository: GitHub via SSH. All machines sync via git push/pull.
+
+### Technology stack
+
+Python (oracledb, omegaconf, pyarrow, pandas), Bash, YAML, Oracle 23ai (vector search, DBMS_VECTOR), SQLCL, Git with GitHub via SSH.
+
+### Project phases
+
+**Phase 0 — Foundation and shared infrastructure** (current, in progress)  
+**Phase 1 — RF2 Ingestion Pipeline**  
+**Phase 2 — MRCM and Semantic Policy Layer**  
+**Phase 3 — Embedding Engine**  
+**Phase 4 — Query and Inference Layer**  
+**Phase 5 — Compliance, Audit and Governance**
+
+### Phase 0 detailed status
+
+**Step 0.1 — YAML configuration files: Complete**
+
+Three config files produced with full inline documentation and `# REQUIRED` markers on mandatory keys. No separate schema document is maintained — inline markers are the authoritative source. Mandatory key enforcement is implemented in the config loader (Step 0.4).
+
+- `config/project.yaml` — global config, OmegaConf interpolation, dual environments (production/dev), paths, venv, governance, SNOMED attribution notice. `active_environment` is top-level key.
+- `config/database.yaml` — TNS config (alias only, TNS_ADMIN from env var), two schemas (snomed, snomed_stage), admin credentials for setup only, connection pool (provisional, tune at Phase 4), table registry (17 tables, Option C — name + RF2 source pattern + description, full DDL in sql/ddl/).
+- `config/ingestion.yaml` — release settings, load behaviour (batch 10000, APPEND hint, commit at end of table), skip_tables convention, national extensions placeholder (Czech/Slovak, pending UZIS response), three-layer validation (RF2-to-table row count equality as primary, static floors as secondary backstop, referential integrity with 9 rules starting advisory), stage-to-production swap (rename strategy, keep previous), load manifest logging.
+
+Table load sequence is derived from database.yaml table list order — no separate load_order list. 17 tables covering all standard international RF2 Snapshot files including MRCM and OWL expression refsets. TextDefinition included as table 3 for Phase 3 embedding value.
+
+**Step 0.2 — Error handling conventions: Complete**
+
+- `src/common/exceptions.py` — SnomedBaseError + 5 subclasses (SnomedConfigError exit 1, SnomedDBConnectionError exit 2, SnomedDDLError exit 3, SnomedLoadError exit 4, SnomedValidationError exit 5). Each class carries exit_code as class attribute. detail parameter is free-form string, never contains credential values.
+- `docs/error_codes.md` — operational reference for all exit codes with causes and remediation steps. Must be kept in sync with exceptions.py. ARADB reference to be made generic in next revision (use tns_alias from database.yaml).
+
+Fail fast, fail loudly rule: no silent exception suppression. `set -euo pipefail` mandatory in all Bash scripts.
+
+**Step 0.3 — Logging utility: Pending** (next step)  
+**Step 0.4 — Configuration loader: Pending**  
+**Step 0.5 — Database connection helper: Pending**  
+**Step 0.6 — Bash orchestrator skeleton: Pending**
+
+### Key architectural decisions
+
+- Drop/recreate approach for releases (snapshot model, not delta)
+- Staging schema pattern: load into snomed_stage, validate, rename-swap to snomed
+- Previous production schema retained as snomed_previous after swap (rollback point)
+- Inactive SNOMED concepts retained (loaded as-is, not filtered)
+- Parquet as intermediate format between RF2 TSV and Oracle load
+- OmegaConf for YAML variable interpolation
+- oracledb thin client, no Oracle Client installation required
+- Passwords in environment variables only, never in YAML or code
+- Standard Python venv, not Anaconda
+- Phase 0 utilities in src/common/ and scripts/common/
+- Two Oracle schemas share one TNS alias, separate credentials
+- Separate OCI block volume for data files
+- Table load sequence derived from database.yaml order, not a separate list
+- No Oracle FK constraints — validation is Python-driven pre-swap SQL checks
+- config_schema.md not produced — inline REQUIRED markers are authoritative
+- Connection pool is provisional, not used in Phase 1, tune before Phase 4
+- National extensions (Czech/Slovak) placeholder in ingestion.yaml, pending UZIS
+
+### Configuration mandatory keys (summary)
+
+Mandatory keys marked with `# REQUIRED` inline in YAML files. Key mandatory ones: `active_environment`, `project.name`, `project.data_release`, `project.snomed_notice`, `environments.<env>.paths.base`, `environments.<env>.paths.log`, `environments.<env>.paths.data_volume`, `environments.<env>.paths.rf2`, `environments.<env>.paths.parquet`, `includes`, `governance.license`, `database.tns_alias`, all schema user and password_env_var fields, `database.tables` (non-empty), all four fields per table entry, `ingestion.release.release_type`, `ingestion.validation.enabled`, `ingestion.swap.strategy`.
+
+### Environment variables required at runtime
+
+`TNS_ADMIN`, `SNOMED_DB_PASSWORD`, `SNOMED_STAGE_DB_PASSWORD`, `SNOMED_ADMIN_DB_PASSWORD` (setup only), `SNOMED_LOG_LEVEL` (optional, default INFO).
+
+### Documents produced
+
+- `config/project.yaml`
+- `config/database.yaml`
+- `config/ingestion.yaml`
+- `src/common/exceptions.py`
+- `docs/phase0_foundation.md`
+- `docs/error_codes.md`
+
+### Next immediate steps
+
+1. Jan to set up GitHub repo and sync to OCI and Ubuntu (in progress)
+2. Jan to write Python script for terminal Claude API access
+3. Discuss logging utility design — Step 0.3
+4. Produce `src/common/logger.py` and `scripts/common/logger.sh`
