@@ -4,8 +4,8 @@
 **Project:** Arachnet Clinical Embeddings  
 **Owner:** Jan Mura, Arachnet Project z.s.  
 **Environment:** OCI Frankfurt, Oracle Linux 9, Oracle Database 23ai  
-**Document version:** 1.1  
-**Date:** 2026-03-26  
+**Document version:** 1.2  
+**Date:** 2026-03-27  
 **Status:** In progress
 
 ---
@@ -82,7 +82,7 @@ Phase-specific YAML files follow the pattern `<phase_name>.yaml`, for example `e
 
 ## Step 0.2 — Error Handling Conventions
 
-**Status:** Pending
+**Status:** Complete
 
 **Depends on:** Step 0.1 — error messages reference config file names and keys defined there
 
@@ -94,14 +94,6 @@ Define and document the error handling contract that all scripts across all phas
 
 - Review of Step 0.1 outputs — config file names, mandatory keys
 - High-level compliance requirements from Phase 5
-
-### Process
-
-1. Define standard exit codes for the project.
-2. Define the fail fast, fail loudly rule — no silent error suppression anywhere.
-3. Define `set -euo pipefail` as mandatory in all Bash scripts.
-4. Define the Python exception hierarchy for project-specific exceptions.
-5. Document how errors propagate from Python to Bash via exit codes and from Bash to the orchestrator.
 
 ### Standard exit codes
 
@@ -125,7 +117,7 @@ SnomedBaseError(Exception)
 └── SnomedValidationError    — exit code 5
 ```
 
-All project exceptions inherit from `SnomedBaseError`. Each exception class carries its exit code as a class attribute so that Bash wrappers can retrieve it without hardcoding the mapping in two places.
+All project exceptions inherit from `SnomedBaseError`. Each exception class carries its exit code as a class attribute so that Bash wrappers can retrieve it without hardcoding the mapping in two places. The `detail` parameter in every exception is a free-form string — it carries table names, key names, Oracle error codes, and similar context. It never contains credential values under any circumstances.
 
 ### Fail fast, fail loudly rule
 
@@ -139,12 +131,12 @@ All Bash scripts must begin with:
 set -euo pipefail
 ```
 
-`-e` aborts on any non-zero exit code. `-u` aborts on reference to an unset variable. `-o pipefail` propagates failures through pipes. These three flags together implement fail fast at the shell level without requiring explicit exit code checks after every command.
+`-e` aborts on any non-zero exit code. `-u` aborts on reference to an unset variable. `-o pipefail` propagates failures through pipes.
 
 ### Outputs
 
-- `src/common/exceptions.py` — Python base exception classes
-- `docs/error_codes.md` — exit code reference document
+- `src/common/exceptions.py` — Python base exception classes. Complete.
+- `docs/error_codes.md` — exit code reference document with causes and remediation steps. Complete.
 
 ---
 
@@ -158,23 +150,44 @@ set -euo pipefail
 
 Provide structured, consistent logging across all Python and Bash scripts in the project, suitable for audit and compliance requirements in later phases.
 
+### Bootstrapping note
+
+The logger cannot read `project.yaml` directly — the config loader does not exist yet when the logger is written, and the logger must have no dependency on the config loader. This is resolved as follows:
+
+The logger reads its configuration from two environment variables only:
+
+- `SNOMED_LOG_DIR` — the directory to write log files to. If not set, the logger falls back to a `log/` directory relative to the project root, derived from the location of the script being run. If that directory is not writable, the logger falls back to stdout only and emits a warning to stderr.
+- `SNOMED_LOG_LEVEL` — verbosity level. If not set, defaults to `INFO`.
+
+Both variables are set in `.bashrc` for manual development use. When the config loader is written (Step 0.4), it exports both variables from `project.yaml` and `ingestion.yaml` respectively as part of its standard environment variable output. From that point the logger uses them automatically without any code change.
+
+This means the logger has zero dependencies on the config loader, the YAML files, or OmegaConf. It is the simplest module in the project after `exceptions.py`.
+
+### Implementation
+
+The logger is a thin wrapper around Python's standard `logging` module. No custom logging framework is written. The standard library module handles file rotation, multiple handlers, log levels, and formatting. The wrapper's only job is to configure handlers consistently so every module in the project gets the same log format without configuring logging itself.
+
+Log files rotate daily using `TimedRotatingFileHandler` — a new file is started at midnight and old files are retained for a configurable number of days (default 30). This is more natural for a pipeline that runs periodically than rotation by file size.
+
 ### Inputs
 
-- `config/project.yaml` — log directory path, environment name
-- Log level from environment variable `SNOMED_LOG_LEVEL`, default `INFO`
+- `SNOMED_LOG_DIR` environment variable — log directory path
+- `SNOMED_LOG_LEVEL` environment variable — log verbosity, default `INFO`
 
 ### Process
 
-1. Initialise a Python `logging` handler writing to both stdout and a rotating log file.
-2. Log format includes: timestamp (ISO 8601), log level, phase, step, script name, message.
-3. Expose a `get_logger(name)` function importable by all Python modules.
-4. Provide Bash logging functions (`log_info`, `log_warn`, `log_error`) sourced by all Bash scripts, writing to the same log directory in the same format.
-5. Log file naming convention: `snomed_<phase>_<step>_<YYYYMMDD_HHMMSS>.log`
+1. Read `SNOMED_LOG_DIR` and `SNOMED_LOG_LEVEL` from environment variables.
+2. Initialise a `TimedRotatingFileHandler` writing to `SNOMED_LOG_DIR` and a `StreamHandler` writing to stdout. Both use the same formatter.
+3. Log format: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s` with ISO 8601 timestamps.
+4. Expose `get_logger(name)` — returns a configured logger instance. The `name` parameter identifies the calling module and appears in every log line, for example `phase1.loader` or `common.config_loader`.
+5. Provide Bash logging functions `log_info`, `log_warn`, `log_error` in `logger.sh`. These write to the same log directory in the same format using `printf` with a timestamp, level, and message. Sourced by all Bash scripts.
+6. Log file naming: `snomed_<YYYYMMDD>.log` — one file per day, rotated at midnight.
 
 ### Error handling
 
-- Log directory not writable — fall back to stdout only, emit a warning via stderr. Do not raise an exception — a logging failure must never suppress the original operation.
-- Never catch and suppress exceptions to protect log integrity.
+- `SNOMED_LOG_DIR` not set — fall back to `./log/` relative to project root. Emit warning to stderr. Do not raise an exception — a logging infrastructure problem must never suppress the original operation.
+- Log directory not writable — fall back to stdout only. Emit warning to stderr. Same reasoning.
+- Never catch and suppress exceptions inside logging calls — if the program raises an error, the logger records it and lets it propagate. The logger is transparent to all errors except its own infrastructure problems.
 
 ### Outputs
 
@@ -206,7 +219,7 @@ Provide a single, reusable Python utility that reads one or more YAML configurat
 4. Resolve `active_environment` and expose the active path set directly as `cfg.paths`.
 5. Validate mandatory keys are present. Raise `SnomedConfigError` (exit code 1) with file name and key name if any mandatory key is absent.
 6. Log a warning on unrecognised keys — not an error, allows forward compatibility.
-7. When called as a CLI tool from Bash: output `export KEY=VALUE` lines suitable for `eval`.
+7. When called as a CLI tool from Bash: output `export KEY=VALUE` lines suitable for `eval`. This includes exporting `SNOMED_LOG_DIR` and `SNOMED_LOG_LEVEL` so the logger picks them up automatically from this point forward.
 8. When imported as a Python module: return the resolved OmegaConf config object.
 
 ### Environment variable naming convention
@@ -360,10 +373,11 @@ The following environment variables must be set before any script runs. The `run
 | Variable | Purpose |
 |----------|---------|
 | `TNS_ADMIN` | Path to directory containing `tnsnames.ora` and `sqlnet.ora` |
+| `SNOMED_LOG_DIR` | Path to log directory — used directly by logger before config loader is available |
+| `SNOMED_LOG_LEVEL` | Log verbosity — optional, defaults to `INFO` |
 | `SNOMED_DB_PASSWORD` | Password for the `snomed` production schema |
 | `SNOMED_STAGE_DB_PASSWORD` | Password for the `snomed_stage` schema |
 | `SNOMED_ADMIN_DB_PASSWORD` | Password for the `system` DBA user — initial setup only |
-| `SNOMED_LOG_LEVEL` | Log verbosity — optional, defaults to `INFO` |
 
 ---
 
