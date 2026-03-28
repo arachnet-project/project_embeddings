@@ -4,7 +4,7 @@
 **Project:** Arachnet Clinical Embeddings
 **Owner:** Jan Mura, Arachnet Project z.s.
 **Environment:** OCI Frankfurt, Oracle Linux 9, Oracle Database 23ai
-**Document version:** 1.3
+**Document version:** 1.4
 **Date:** 2026-03-28
 **Status:** In progress
 
@@ -21,6 +21,10 @@ Phase 0 produces no clinical data output. Its outputs are infrastructure:
 configuration files, shared Python modules, Bash utilities, and documented
 conventions.
 
+**Target platforms:** Oracle Linux 9 (OCI, production), Ubuntu (primary
+development). Unix/Linux only. Mac Studio is reserved for Phase 3
+ML/embedding computations and is not a pipeline or development platform.
+
 ---
 
 ## Implementation Note
@@ -30,32 +34,21 @@ document. Each step has explicit dependencies on earlier steps.
 Implementing steps out of order will result in modules that must be
 retrofitted to comply with conventions defined later.
 
-The sequence below differs from the original logical component list. It
-reflects the correct build order:
+Correct build order:
 
-- Error handling conventions are defined first because every module
-  depends on them.
-- Logging is implemented second because every subsequent module uses it.
-- Configuration loading is third because it depends on both logger and
-  exceptions.
-- Database connection helper is fourth because it depends on the config
-  loader.
-- The Bash orchestrator is fifth because it wires all of the above
-  together.
-- YAML configuration files are treated as Step 0.1 because they were
-  completed first and are a prerequisite for all code steps.
+- Error handling conventions first — every module depends on them.
+- Logging second — every subsequent module uses it.
+- Configuration loading third — depends on logger and exceptions.
+- Database connection helper fourth — depends on config loader.
+- Bash orchestrator fifth — wires everything together.
+- YAML configuration files are Step 0.1 — completed first, prerequisite
+  for all code steps.
 
 ---
 
 ## Step 0.1 — Configuration Design (YAML File Schemas)
 
 **Status:** Complete
-
-### Purpose
-
-Define the structure, ownership, and validation rules for all YAML
-configuration files in scope for Phase 1, following a pattern extensible
-to later phases.
 
 ### Outputs
 
@@ -65,46 +58,36 @@ to later phases.
 
 ### Key design decisions
 
-**OmegaConf** is used for YAML loading and variable interpolation.
-Interpolation syntax is `${path.to.key}`.
+**OmegaConf** used for YAML loading and variable interpolation.
+Syntax: `${path.to.key}`.
 
-`active_environment` is a top-level key. The config loader reads it and
-indexes into the `environments` block to resolve the active path set.
-Switching between `production` and `dev` requires changing only this one
-key.
+`active_environment` is a top-level key. Switching environments requires
+changing only this one key.
 
-All passwords are referenced via environment variable names only. No
-credential values appear in any YAML file.
+All passwords referenced via environment variable names only. No
+credential values in any YAML file.
 
-`database.yaml` includes a table registry (Option C): table name, schema
-ownership, RF2 source folder, RF2 filename pattern, and a one-line
-description per table. Full DDL lives in `sql/ddl/`. Oracle
-`ALL_TAB_COLUMNS` is the runtime authoritative source for column
-definitions.
+`database.yaml` table registry (Option C): table name, schema ownership,
+RF2 source folder, RF2 filename pattern, description. Full DDL in
+`sql/ddl/`. Oracle `ALL_TAB_COLUMNS` is authoritative for column
+definitions at runtime.
 
-`ingestion.yaml` derives table load sequence from the order of entries
-in `database.yaml`. No separate load order list is maintained.
+`ingestion.yaml` derives table load sequence from `database.yaml` order.
+No separate load order list.
 
-`includes` in `project.yaml` lists the phase-specific config files to be
-merged by the config loader. Each included file is merged as a named
-sub-tree (`cfg.database`, `cfg.ingestion`) to prevent key collisions.
+`includes` in `project.yaml` lists phase-specific config files merged as
+named sub-trees (`cfg.database`, `cfg.ingestion`).
 
 ### Mandatory key convention
 
-Keys essential for the system to function are marked with an inline
-`# REQUIRED` comment in the YAML file. This is the single authoritative
-source for mandatory key definitions. No separate schema document is
-maintained.
+Keys marked with `# REQUIRED` inline in YAML. Single authoritative
+source — no separate schema document. Config loader enforces mandatory
+keys and aborts with exit code 1 identifying file and key if absent.
+Unrecognised keys produce a warning only.
 
-The config loader enforces mandatory keys by checking a list defined in
-the loader code. If a mandatory key is absent, the loader aborts with
-exit code 1 and identifies the file and key by name. Unrecognised keys
-produce a warning but do not abort.
+### Future phase config naming
 
-### Naming convention for future phase config files
-
-Phase-specific YAML files follow the pattern `<phase_name>.yaml`, for
-example `embedding.yaml`, `policy.yaml`, `query.yaml`.
+Pattern: `<phase_name>.yaml` — e.g. `embedding.yaml`, `policy.yaml`.
 
 ---
 
@@ -136,28 +119,32 @@ SnomedBaseError(Exception)
 └── SnomedValidationError    — exit code 5
 ```
 
-Each exception class carries its exit code as a class attribute. The
-`detail` parameter is a free-form string — table names, key names, Oracle
-error codes. Never contains credential values.
+Each class carries `exit_code` as a class attribute. `detail` parameter
+is a free-form string — never contains credential values.
 
-### Fail fast, fail loudly rule
+### Fail fast, fail loudly
 
-No exception may be caught and suppressed silently anywhere in the
-project. A bare `except: pass` is forbidden. A `finally` block for
-resource cleanup is permitted as long as the exception still propagates.
+No silent exception suppression anywhere. `except: pass` is forbidden.
+`finally` for resource cleanup is permitted — exception must still
+propagate.
 
 ### Bash conventions
 
-All Bash scripts must begin with:
+All executable Bash scripts must begin with:
 
 ```bash
 set -euo pipefail
+export LC_ALL=C.UTF-8
 ```
+
+`LC_ALL=C.UTF-8` is set in executable scripts, not in sourced libraries.
+It forces English output from system commands while preserving UTF-8
+encoding for data. `C.UTF-8` is supported on Oracle Linux 9 and Ubuntu.
 
 ### Outputs
 
-- `src/common/exceptions.py` — Python base exception classes. Complete.
-- `docs/error_codes.md` — exit code reference with causes and remediation. Complete.
+- `src/common/exceptions.py` — Complete
+- `docs/error_codes.md` — Complete
 
 ---
 
@@ -175,40 +162,41 @@ suitable for audit and compliance requirements in later phases.
 ### Bootstrapping note
 
 The logger cannot read `project.yaml` directly — the config loader does
-not exist yet. The logger reads configuration from two environment
-variables only:
+not exist yet. The logger reads configuration from environment variables
+only:
 
-- `SNOMED_LOG_DIR` — log directory. If not set, falls back to `./log/`
-  relative to the current working directory. If not writable, falls back
-  to stdout only with a warning to stderr.
+- `SNOMED_LOG_DIR` — log directory. Falls back to `./log/` if not set.
+  Falls back to stdout only if not writable, with a warning to stderr.
 - `SNOMED_LOG_LEVEL` — verbosity. Default: `INFO`.
 
 Both variables are set in `.bashrc` on each machine. When the config
-loader is written (Step 0.4), it exports both variables automatically.
-The logger requires no code change at that point.
+loader is written (Step 0.4), it exports both variables automatically —
+no change to the logger required.
 
-This gives the logger zero dependencies on the config loader, YAML files,
-or OmegaConf.
+The logger has zero dependencies on the config loader, YAML files, or
+OmegaConf.
 
 ### Implementation
 
-The Python logger is a thin wrapper around Python's standard `logging`
-module. Log files rotate daily using `TimedRotatingFileHandler` — a new
-file starts at midnight, old files retained 30 days. Current log file is
-always `snomed.log`. Rotated files are named `snomed.log.YYYY-MM-DD`.
+**Python logger** — thin wrapper around Python's standard `logging`
+module. `TimedRotatingFileHandler` rotates at midnight, retains 30 days.
+Current log file: `snomed.log`. Rotated files: `snomed.log.YYYY-MM-DD`.
 
-The Bash logger is a sourced library. It does not set shell options or
-traps — those are the responsibility of calling scripts. It does set
-`LC_ALL=C.UTF-8` to ensure English output from system commands regardless
-of shell locale.
+**Bash logger** — sourced library (`scripts/common/logger.sh`). Does not
+set shell options, traps, or locale variables — those are the
+responsibility of calling scripts. Functions prefixed with `_` are
+internal by naming convention only (Bash has no access control).
 
-Both loggers use the same format for consistent reading of mixed logs:
+Both use the same log format:
 ```
 YYYY-MM-DDTHH:MM:SS | LEVEL    | name                                     | message
 ```
 
-Functions prefixed with `_` are internal by convention. Bash has no true
-access control — this is naming convention only.
+### Locale handling
+
+`LC_ALL=C.UTF-8` is set by each executable script that sources
+`logger.sh`, not by `logger.sh` itself. Setting locale in a sourced
+library would unexpectedly affect the parent shell's environment.
 
 ### Inputs
 
@@ -223,11 +211,10 @@ access control — this is naming convention only.
 ### Testing
 
 - `tests/test_logger.sh` — platform verification test
-- `docs/test_logger_protocol.md` — test protocol with three passes and
-  pass criteria table
+- `docs/test_logger_protocol.md` — three-pass test protocol
 
-Test must pass on all three platforms (macOS, Ubuntu, OCI) before Step
-0.3 is marked Complete.
+Must pass on both platforms (Ubuntu, OCI Oracle Linux 9) before Step 0.3
+is marked Complete.
 
 ---
 
@@ -235,33 +222,28 @@ Test must pass on all three platforms (macOS, Ubuntu, OCI) before Step
 
 **Status:** Pending
 
-**Depends on:** Step 0.2 (raises typed exceptions on config errors),
-Step 0.3 (logs warnings on unrecognised keys)
+**Depends on:** Steps 0.2, 0.3
 
 ### Purpose
 
-Provide a single, reusable Python utility that reads YAML configuration
-files, validates their contents, merges them into a single config object,
-and makes values available to both Python modules and Bash scripts.
+Single reusable Python utility that reads YAML files, validates contents,
+merges into a config object, and exports values to Bash and Python.
 
 ### Process
 
-1. Accept YAML file paths as command-line arguments.
-2. Load `project.yaml` first, then merge files in its `includes` block as
-   named sub-trees (`cfg.database`, `cfg.ingestion`).
+1. Accept YAML file paths as CLI arguments.
+2. Load `project.yaml` first, merge `includes` as named sub-trees.
 3. Resolve OmegaConf interpolations.
-4. Resolve `active_environment` and expose the active path set as
-   `cfg.paths`.
-5. Validate mandatory keys. Raise `SnomedConfigError` (exit 1) with file
-   and key name if absent.
-6. Log a warning on unrecognised keys.
-7. As CLI tool: output `export KEY=VALUE` lines for `eval`. Includes
-   `SNOMED_LOG_DIR` and `SNOMED_LOG_LEVEL` to close the bootstrapping loop.
-8. As Python module: return the resolved OmegaConf config object.
+4. Resolve `active_environment`, expose active paths as `cfg.paths`.
+5. Validate mandatory keys. Raise `SnomedConfigError` (exit 1) if absent.
+6. Log warning on unrecognised keys.
+7. As CLI: output `export KEY=VALUE` lines for `eval` — includes
+   `SNOMED_LOG_DIR` and `SNOMED_LOG_LEVEL` to close bootstrapping loop.
+8. As Python module: return resolved OmegaConf config object.
 
-### Environment variable naming convention
+### Environment variable naming
 
-`SNOMED_<SECTION>_<KEY>` in uppercase, for example `SNOMED_PROJECT_NAME`,
+`SNOMED_<SECTION>_<KEY>` uppercase — e.g. `SNOMED_PROJECT_NAME`,
 `SNOMED_DB_TNS_ALIAS`, `SNOMED_PATHS_LOG`.
 
 ### Outputs
@@ -276,11 +258,6 @@ and makes values available to both Python modules and Bash scripts.
 
 **Depends on:** Steps 0.2, 0.3, 0.4
 
-### Purpose
-
-Provide a reusable Python module that establishes and manages Oracle 23ai
-database connections, abstracting all connection details from phase scripts.
-
 ### Interface
 
 | Method | Purpose |
@@ -290,8 +267,8 @@ database connections, abstracting all connection details from phase scripts.
 | `execute_ddl(conn, sql)` | DDL execution with error handling |
 | `execute_batch(conn, sql, data, batch_size)` | Bulk DML via `executemany()` |
 
-All connections use `autocommit=False`. Phase 1 uses `get_connection()`
-only — the pool is not used until Phase 3.
+`autocommit=False` on all connections. Phase 1 uses `get_connection()`
+only.
 
 ### Outputs
 
@@ -307,16 +284,11 @@ only — the pool is not used until Phase 3.
 
 ### Purpose
 
-Provide the top-level Bash entry point that sources configuration,
-initialises logging, validates the environment, and invokes phase scripts
-in sequence with consistent error propagation.
+Top-level Bash entry point. Sources config, initialises logging,
+validates environment, invokes phase scripts with error propagation.
 
-### Deploy and initialisation mode
-
-`run.sh --init` creates missing directories, verifies the virtual
-environment, and checks all required environment variables. Does not
-invoke any pipeline scripts. Run on every new machine and at the start
-of each terminal session if `.bashrc` is not configured.
+`run.sh --init` creates missing directories, verifies venv, checks all
+required environment variables. Does not invoke pipeline scripts.
 
 ### Outputs
 
@@ -370,25 +342,22 @@ project_embeddings/
 
 ## Dependencies and Environment Requirements
 
-Python packages required for Phase 0:
-
 | Package | Purpose |
 |---------|---------|
 | `oracledb` | Oracle 23ai thin client |
 | `omegaconf` | YAML loading and variable interpolation |
 
-Required environment variables:
-
 | Variable | Purpose |
 |----------|---------|
-| `TNS_ADMIN` | Path to `tnsnames.ora` and `sqlnet.ora` |
-| `SNOMED_LOG_DIR` | Log directory — used by logger before config loader runs |
+| `TNS_ADMIN` | Path to `tnsnames.ora` and `sqlnet.ora` (OCI only) |
+| `SNOMED_LOG_DIR` | Log directory |
 | `SNOMED_LOG_LEVEL` | Log verbosity — optional, default `INFO` |
 | `SNOMED_DB_PASSWORD` | Password for `snomed` schema |
 | `SNOMED_STAGE_DB_PASSWORD` | Password for `snomed_stage` schema |
 | `SNOMED_ADMIN_DB_PASSWORD` | Password for `system` DBA user — setup only |
+| `LC_ALL` | Set to `C.UTF-8` in `.bashrc` on all machines |
 
-See `docs/git_workflow.md` for `.bashrc` setup per machine.
+See `docs/git_workflow.md` for full `.bashrc` setup per machine.
 
 ---
 

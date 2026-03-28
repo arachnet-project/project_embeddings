@@ -6,12 +6,12 @@
 # Source it at the top of every Bash script:
 #   source "$(dirname "$0")/../common/logger.sh"
 #
-# This file does NOT set shell options (set -euo pipefail) or traps.
-# Those are the responsibility of the calling script.
-# Setting them here would affect the sourcing shell in unpredictable ways.
+# Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 #
-# Writes to the same log directory as logger.py.
-# Format mirrors the Python log format for consistent reading of mixed logs.
+# This file does NOT set shell options (set -euo pipefail), traps,
+# or locale variables. Those are the responsibility of the calling
+# script. Setting them here would affect the sourcing shell in
+# unpredictable ways and is not the role of a sourced library.
 #
 # Environment variables read:
 #   SNOMED_LOG_DIR   — log directory. Default: ./log/
@@ -22,30 +22,19 @@
 #   log_warn  "phase1" "step1.2" "skip_tables is non-empty"
 #   log_error "phase1" "step1.2" "Load failed — exit code $?"
 #
-# Last modified: 2026-03-27
+# Last modified: 2026-03-28
 
 # ---------------------------------------------------------------------------
 # Bash version check
-# Requires Bash 4.0 or later. macOS ships Bash 3.2 by default — install
-# a current Bash via Homebrew if needed: brew install bash
-# OCI Oracle Linux 9 and Ubuntu ship Bash 5.x — no action needed.
+# Requires Bash 4.0 or later.
+# Oracle Linux 9 and Ubuntu ship Bash 5.x — this check is a safety net.
 # ---------------------------------------------------------------------------
 
 if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
     printf "ERROR: logger.sh requires Bash 4.0 or later.\n" >&2
     printf "Current version: %s\n" "${BASH_VERSION}" >&2
-    printf "On macOS install current Bash via: brew install bash\n" >&2
     exit 1
 fi
-
-# ---------------------------------------------------------------------------
-# Locale — force English output from all system commands, keep UTF-8
-# encoding so non-ASCII characters in data and messages are handled
-# correctly. Without this, system error messages may appear in Czech
-# if the shell locale is set to cs_CZ, producing mixed-language log files.
-# ---------------------------------------------------------------------------
-
-export LC_ALL=C.UTF-8
 
 # ---------------------------------------------------------------------------
 # Resolve configuration from environment
@@ -72,7 +61,7 @@ fi
 # Level filtering
 # Map level name strings to numeric values for comparison.
 # Naming convention: functions prefixed with _ are internal to this file.
-# There are no true private functions in Bash — this is a convention only.
+# There are no true private functions in Bash — this is convention only.
 # ---------------------------------------------------------------------------
 
 _level_value() {
@@ -113,7 +102,7 @@ _log_write() {
     fi
 
     # Format mirrors Python logger output:
-    # 2026-03-27T14:23:01 | INFO     | phase1.step1.2            | message
+    # 2026-03-28T14:23:01 | INFO     | phase1.step1.2            | message
     local timestamp
     timestamp=$(date '+%Y-%m-%dT%H:%M:%S')
 

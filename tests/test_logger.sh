@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # test_logger.sh
 # Verification test for logger.sh.
-# Run this on each platform (macOS, OCI Oracle Linux 9, Ubuntu) after
+# Run this on each platform (OCI Oracle Linux 9, Ubuntu) after
 # setting up environment variables in .bashrc.
 #
 # Located in: tests/
 # Tests:      scripts/common/logger.sh
+# Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 #
 # This script does NOT set SNOMED_LOG_DIR or SNOMED_LOG_LEVEL.
 # It relies entirely on whatever is set in the environment.
@@ -14,18 +15,20 @@
 # Usage (run from project root):
 #   bash tests/test_logger.sh
 #
-# Expected outcome:
-#   - All test lines appear on stdout in the correct format
-#   - A log file is created in $SNOMED_LOG_DIR
-#   - The log file contains the same lines as stdout
-#   - The DEBUG line does NOT appear when SNOMED_LOG_LEVEL=INFO
-#   - The script exits with code 0
-#
 # See docs/test_logger_protocol.md for the full test protocol.
 #
 # Last modified: 2026-03-28
 
 set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# Locale — set here in the calling script, not in the sourced library.
+# Forces English output from system commands (date, mkdir, etc.)
+# while preserving UTF-8 encoding for data and messages.
+# C.UTF-8 is supported on Oracle Linux 9 and Ubuntu.
+# ---------------------------------------------------------------------------
+
+export LC_ALL=C.UTF-8
 
 # ---------------------------------------------------------------------------
 # Locate logger.sh relative to this script's location.

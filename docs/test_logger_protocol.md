@@ -1,24 +1,22 @@
 # Logger Test Protocol — Step 0.3
 ## Arachnet Clinical Embeddings
 
-**Document version:** 1.1
+**Document version:** 1.2
 **Date:** 2026-03-28
 **Applies to:** `src/common/logger.py`, `scripts/common/logger.sh`
 **Test script:** `tests/test_logger.sh`
+**Target platforms:** Oracle Linux 9 (OCI), Ubuntu
 
 ---
 
 ## Purpose
 
-Verify that the logging utility works correctly on all three platforms before
-any other Phase 0 code is written. The logger is a dependency of every
-subsequent module — a defect here propagates everywhere.
+Verify that the logging utility works correctly on both target platforms
+before any other Phase 0 code is written. The logger is a dependency of
+every subsequent module — a defect here propagates everywhere.
 
-Platforms to test:
-
-- macOS (MacBook Pro M1, primary dev machine)
-- Ubuntu (MacBook Air Intel, secondary dev machine — becoming primary)
-- OCI Oracle Linux 9 (production)
+The project targets Unix/Linux only. Oracle Linux 9 is the primary
+production platform. Ubuntu is the primary development platform.
 
 ---
 
@@ -26,22 +24,16 @@ Platforms to test:
 
 ### 1. Environment variables set in `.bashrc`
 
-Add the following to `~/.bashrc` on each machine before running the test.
-Adjust the path to match the machine's project root.
+Add the following to `~/.bashrc` on each machine. Adjust paths to match
+the machine's project root.
 
-**macOS:**
-```bash
-export SNOMED_LOG_DIR="/Users/jan/arachnet/snomed/project_embeddings/log"
-export SNOMED_LOG_LEVEL="DEBUG"
-```
-
-**Ubuntu:**
+**Ubuntu (primary dev):**
 ```bash
 export SNOMED_LOG_DIR="/home/jan/project_embeddings/log"
 export SNOMED_LOG_LEVEL="DEBUG"
 ```
 
-**OCI:**
+**OCI Oracle Linux 9 (production):**
 ```bash
 export SNOMED_LOG_DIR="/home/opc/project_embeddings/log"
 export SNOMED_LOG_LEVEL="DEBUG"
@@ -50,12 +42,12 @@ export SNOMED_LOG_LEVEL="DEBUG"
 Set `SNOMED_LOG_LEVEL=DEBUG` for the test so all four log levels are
 exercised. After the test passes, change to `INFO` for normal use.
 
-After editing `.bashrc`, apply changes to the current session:
+Apply changes to the current session:
 ```bash
 source ~/.bashrc
 ```
 
-Verify the variables are set:
+Verify:
 ```bash
 echo $SNOMED_LOG_DIR
 echo $SNOMED_LOG_LEVEL
@@ -63,13 +55,12 @@ echo $SNOMED_LOG_LEVEL
 
 ### 2. Files in place
 
-Confirm both files exist at the correct paths:
 ```bash
 ls scripts/common/logger.sh
 ls tests/test_logger.sh
 ```
 
-### 3. Execute permission set
+### 3. Execute permission
 
 ```bash
 chmod +x tests/test_logger.sh
@@ -79,7 +70,7 @@ chmod +x tests/test_logger.sh
 
 ## Test procedure
 
-Run all commands from the project root directory on each machine.
+Run all commands from the project root directory.
 
 ### Pass 1 — Full DEBUG output
 
@@ -102,7 +93,8 @@ SNOMED_LOG_DIR="/root/no_permission" bash tests/test_logger.sh
 ```
 
 Expected: WARNING on stderr about the log directory, all four log lines
-on stdout only. Script must complete with exit code 0.
+on stdout only. Script must complete with exit code 0. This confirms
+the fallback behaviour works — logging failure never aborts the program.
 
 ---
 
@@ -112,7 +104,7 @@ on stdout only. Script must complete with exit code 0.
 
 ```
 --- Logger test ---
-Platform    : Darwin 24.x.x arm64          ← or Linux on OCI/Ubuntu
+Platform    : Linux 5.x.x x86_64
 Bash version: 5.x.x(1)-release
 Project root: /path/to/project_embeddings
 SNOMED_LOG_DIR  : /path/to/log
@@ -145,8 +137,6 @@ The ERROR line produces an additional stderr line:
 ERROR: ERROR message — simulated load failure
 ```
 
-This is correct — errors go to both the log and stderr.
-
 ---
 
 ## Pass criteria
@@ -157,10 +147,10 @@ All of the following must be true on each platform after Pass 1:
 |---|-------|---------------|
 | 1 | All four log level lines appear on stdout | Visual inspection |
 | 2 | DEBUG line appears (SNOMED_LOG_LEVEL=DEBUG) | Visual inspection |
-| 3 | Format: `timestamp \| level \| name \| message` | Visual inspection |
+| 3 | Format correct: `timestamp \| level \| name \| message` | Visual inspection |
 | 4 | Log file created in `SNOMED_LOG_DIR` | Verification section |
 | 5 | Log file contains same four lines as stdout | `tail -5` in verification |
-| 6 | ERROR line also on stderr | `bash tests/test_logger.sh > /dev/null` — ERROR line still visible |
+| 6 | ERROR line also on stderr | `bash tests/test_logger.sh > /dev/null` — ERROR still visible |
 | 7 | `LC_ALL` is `C.UTF-8` | Reported in environment section |
 | 8 | Bash version is 4.0 or later | Reported in environment section |
 | 9 | Exit code is 0 | `echo $?` immediately after run |
@@ -173,27 +163,27 @@ After Pass 3: WARNING on stderr, all four lines on stdout, exit code 0.
 
 ## Recording results
 
-| Field | macOS | Ubuntu | OCI |
-|-------|-------|--------|-----|
-| Date tested | | | |
-| Bash version | | | |
-| All pass criteria met | | | |
-| Notes | | | |
+| Field | Ubuntu | OCI Oracle Linux 9 |
+|-------|--------|--------------------|
+| Date tested | | |
+| Bash version | | |
+| All pass criteria met | | |
+| Notes | | |
 
 ---
 
 ## Failure handling
 
 1. Note which criterion failed and on which platform.
-2. Check stderr output for warning or error messages.
-3. Do not proceed to Step 0.4 until the logger passes on all platforms.
+2. Check stderr for warning or error messages.
+3. Do not proceed to Step 0.4 until the logger passes on both platforms.
 4. Fix the defect in `logger.sh`, re-run the full test procedure.
 
 ---
 
-## After passing on all platforms
+## After passing on both platforms
 
-1. Change `SNOMED_LOG_LEVEL` from `DEBUG` to `INFO` in `.bashrc` on all
+1. Change `SNOMED_LOG_LEVEL` from `DEBUG` to `INFO` in `.bashrc` on both
    machines and run `source ~/.bashrc`.
 2. Mark Step 0.3 as Complete in `docs/phase0_foundation.md`.
 3. Commit:
@@ -204,7 +194,7 @@ After Pass 3: WARNING on stderr, all four lines on stdout, exit code 0.
    git commit -m "test: Step 0.3 logger.sh tested and passing on all platforms"
    git push
    ```
-4. Pull on all other machines:
+4. Pull on the other machine:
    ```bash
    git pull
    ```
