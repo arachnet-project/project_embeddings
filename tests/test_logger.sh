@@ -4,12 +4,15 @@
 # Run this on each platform (macOS, OCI Oracle Linux 9, Ubuntu) after
 # setting up environment variables in .bashrc.
 #
+# Located in: tests/
+# Tests:      scripts/common/logger.sh
+#
 # This script does NOT set SNOMED_LOG_DIR or SNOMED_LOG_LEVEL.
 # It relies entirely on whatever is set in the environment.
 # That is intentional — it tests the real setup, not a local override.
 #
-# Usage:
-#   bash scripts/common/test_logger.sh
+# Usage (run from project root):
+#   bash tests/test_logger.sh
 #
 # Expected outcome:
 #   - All test lines appear on stdout in the correct format
@@ -20,17 +23,28 @@
 #
 # See docs/test_logger_protocol.md for the full test protocol.
 #
-# Last modified: 2026-03-27
+# Last modified: 2026-03-28
 
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Locate and source logger.sh relative to this script's location.
-# This works regardless of which directory the script is called from.
+# Locate logger.sh relative to this script's location.
+# test_logger.sh lives in tests/
+# logger.sh lives in scripts/common/
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/logger.sh"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+LOGGER_SH="${PROJECT_ROOT}/scripts/common/logger.sh"
+
+if [ ! -f "${LOGGER_SH}" ]; then
+    printf "ERROR: Cannot find logger.sh at expected path:\n" >&2
+    printf "  %s\n" "${LOGGER_SH}" >&2
+    printf "Run this script from the project root: bash tests/test_logger.sh\n" >&2
+    exit 1
+fi
+
+source "${LOGGER_SH}"
 
 # ---------------------------------------------------------------------------
 # Report environment before running tests
@@ -39,6 +53,7 @@ source "${SCRIPT_DIR}/logger.sh"
 printf "\n--- Logger test ---\n"
 printf "Platform    : %s\n" "$(uname -s -r -m)"
 printf "Bash version: %s\n" "${BASH_VERSION}"
+printf "Project root: %s\n" "${PROJECT_ROOT}"
 printf "SNOMED_LOG_DIR  : %s\n" "${SNOMED_LOG_DIR:-<not set — using default>}"
 printf "SNOMED_LOG_LEVEL: %s\n" "${SNOMED_LOG_LEVEL:-<not set — using default INFO>}"
 printf "Log file    : %s\n" "${_LOG_FILE}"
