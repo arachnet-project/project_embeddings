@@ -21,7 +21,7 @@
 #   logger.error("Batch insert failed: %s", detail)
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-# Last modified: 2026-03-30
+# Last modified: 2026-04-01
 
 import logging
 import logging.handlers
@@ -39,6 +39,7 @@ _LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 _LOG_BACKUP_COUNT = 30
 _DEFAULT_LOG_LEVEL = "INFO"
 
+_VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 # Guard against duplicate handler registration when get_logger() is called
 # multiple times across modules in the same process. Without this guard,
 # each call would add another handler and every log line would print
@@ -63,7 +64,7 @@ def _initialise_logging() -> None:
     # --- Resolve log level ---------------------------------------------------
     level_name = os.environ.get("SNOMED_LOG_LEVEL", _DEFAULT_LOG_LEVEL).upper()
     level = getattr(logging, level_name, logging.INFO)
-    if level_name not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+    if level_name not in  _VALID_LOG_LEVELS:
         sys.stderr.write(
             "WARNING: SNOMED_LOG_LEVEL='{}' is not valid. "
             "Using INFO.\n".format(level_name)
