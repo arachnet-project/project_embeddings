@@ -21,7 +21,7 @@
 #   logger.error("Batch insert failed: %s", detail)
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-# Last modified: 2026-03-30
+# Last modified: 2026-04-01
 
 import logging
 import logging.handlers
@@ -38,6 +38,7 @@ _LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-40s | %(message)s"
 _LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 _LOG_BACKUP_COUNT = 30
 _DEFAULT_LOG_LEVEL = "INFO"
+_VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 # Guard against duplicate handler registration when get_logger() is called
 # multiple times across modules in the same process. Without this guard,
@@ -47,7 +48,7 @@ _initialised = False
 
 
 # ---------------------------------------------------------------------------
-# Internal setup function
+# --- _initialise_logging ---------------------------------------------------
 # ---------------------------------------------------------------------------
 
 def _initialise_logging() -> None:
@@ -60,17 +61,18 @@ def _initialise_logging() -> None:
     if _initialised:
         return
 
-    # --- Resolve log level ---------------------------------------------------
+    # --- Resolve log level
     level_name = os.environ.get("SNOMED_LOG_LEVEL", _DEFAULT_LOG_LEVEL).upper()
     level = getattr(logging, level_name, logging.INFO)
-    if level_name not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+    if level_name not in _VALID_LOG_LEVELS:
         sys.stderr.write(
             "WARNING: SNOMED_LOG_LEVEL='{}' is not valid. "
             "Using INFO.\n".format(level_name)
         )
         level = logging.INFO
+    # --- end resolve log level
 
-    # --- Resolve log directory -----------------------------------------------
+    # --- Resolve log directory
     log_dir_str = os.environ.get("SNOMED_LOG_DIR", "")
     if log_dir_str:
         log_dir = Path(log_dir_str)
@@ -80,24 +82,25 @@ def _initialise_logging() -> None:
             "WARNING: SNOMED_LOG_DIR not set. "
             "Falling back to {}\n".format(log_dir)
         )
+    # --- end resolve log directory
 
-    # --- Configure formatter -------------------------------------------------
+    # --- Configure formatter
     formatter = logging.Formatter(
         fmt=_LOG_FORMAT,
         datefmt=_LOG_DATE_FORMAT
     )
 
-    # --- Configure root logger -----------------------------------------------
+    # --- Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    # --- Stdout handler — always present -------------------------------------
+    # --- Stdout handler — always present
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(formatter)
     stdout_handler.setLevel(level)
     root_logger.addHandler(stdout_handler)
 
-    # --- File handler — added only if log directory is usable ---------------
+    # --- File handler — added only if log directory is usable
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "snomed.log"
@@ -124,12 +127,15 @@ def _initialise_logging() -> None:
             "WARNING: Cannot write to log directory '{}': {}. "
             "Logging to stdout only.\n".format(log_dir, e)
         )
+    # --- end file handler
 
     _initialised = True
 
+# --- end _initialise_logging -----------------------------------------------
+
 
 # ---------------------------------------------------------------------------
-# Public interface
+# --- get_logger ------------------------------------------------------------
 # ---------------------------------------------------------------------------
 
 def get_logger(name: str) -> logging.Logger:
@@ -153,6 +159,12 @@ def get_logger(name: str) -> logging.Logger:
     _initialise_logging()
     return logging.getLogger(name)
 
+# --- end get_logger --------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# --- get_phase_logger ------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 def get_phase_logger(phase: str, step: str, script: str) -> logging.Logger:
     """
@@ -174,8 +186,10 @@ def get_phase_logger(phase: str, step: str, script: str) -> logging.Logger:
         logger = get_phase_logger("phase1", "step1.2", "load_concepts")
         logger.info("Starting load")
         # Produces:
-        # 2026-03-30T14:23:01 | INFO     | phase1.step1.2.load_concepts | Starting load
+        # 2026-04-01T14:23:01 | INFO | phase1.step1.2.load_concepts | Starting load
     """
     _initialise_logging()
     logger_name = "{}.{}.{}".format(phase, step, script)
     return logging.getLogger(logger_name)
+
+# --- end get_phase_logger --------------------------------------------------
