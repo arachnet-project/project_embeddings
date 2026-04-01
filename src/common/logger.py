@@ -20,7 +20,8 @@
 #   logger.info("Loading RF2 file: %s", filepath)
 #   logger.error("Batch insert failed: %s", detail)
 #
-# Last modified: 2026-03-27
+# Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
+# Last modified: 2026-03-30
 
 import logging
 import logging.handlers
@@ -34,12 +35,14 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 _LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-40s | %(message)s"
-_LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"   # ISO 8601, no microseconds
-_LOG_BACKUP_COUNT = 30                    # retain 30 days of rotated log files
+_LOG_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+_LOG_BACKUP_COUNT = 30
 _DEFAULT_LOG_LEVEL = "INFO"
 
-# Track whether handlers have been initialised to avoid duplicate setup
-# when get_logger() is called multiple times across modules.
+# Guard against duplicate handler registration when get_logger() is called
+# multiple times across modules in the same process. Without this guard,
+# each call would add another handler and every log line would print
+# multiple times.
 _initialised = False
 
 
@@ -50,7 +53,7 @@ _initialised = False
 def _initialise_logging() -> None:
     """
     Configure the root logger with a file handler and a stdout handler.
-    Called once on first get_logger() invocation.
+    Called once on first get_logger() or get_phase_logger() invocation.
     Subsequent calls are no-ops due to the _initialised guard.
     """
     global _initialised
@@ -61,10 +64,9 @@ def _initialise_logging() -> None:
     level_name = os.environ.get("SNOMED_LOG_LEVEL", _DEFAULT_LOG_LEVEL).upper()
     level = getattr(logging, level_name, logging.INFO)
     if level_name not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
-        # Invalid level specified — fall back and warn
         sys.stderr.write(
-            f"WARNING: SNOMED_LOG_LEVEL='{level_name}' is not valid. "
-            f"Using INFO.\n"
+            "WARNING: SNOMED_LOG_LEVEL='{}' is not valid. "
+            "Using INFO.\n".format(level_name)
         )
         level = logging.INFO
 
@@ -73,11 +75,10 @@ def _initialise_logging() -> None:
     if log_dir_str:
         log_dir = Path(log_dir_str)
     else:
-        # Fall back to ./log/ relative to current working directory
         log_dir = Path.cwd() / "log"
         sys.stderr.write(
-            f"WARNING: SNOMED_LOG_DIR not set. "
-            f"Falling back to {log_dir}\n"
+            "WARNING: SNOMED_LOG_DIR not set. "
+            "Falling back to {}\n".format(log_dir)
         )
 
     # --- Configure formatter -------------------------------------------------
@@ -103,13 +104,13 @@ def _initialise_logging() -> None:
 
         file_handler = logging.handlers.TimedRotatingFileHandler(
             filename=str(log_file),
-            when="midnight",          # rotate at midnight
-            interval=1,               # every 1 day
+            when="midnight",
+            interval=1,
             backupCount=_LOG_BACKUP_COUNT,
             encoding="utf-8",
-            utc=False                 # use local time for rotation boundary
+            utc=False
         )
-        # Rotated files are named snomed.log.YYYY-MM-DD
+        # Rotated files named snomed.log.YYYY-MM-DD
         file_handler.suffix = "%Y-%m-%d"
         file_handler.setFormatter(formatter)
         file_handler.setLevel(level)
@@ -117,12 +118,11 @@ def _initialise_logging() -> None:
 
     except OSError as e:
         # Log directory not writable — fall back to stdout only.
-        # This is not fatal. The program continues; we just lose the file log.
-        # Do NOT raise here — a logging infrastructure failure must never
+        # Do NOT raise — a logging infrastructure failure must never
         # suppress the original operation.
         sys.stderr.write(
-            f"WARNING: Cannot write to log directory '{log_dir}': {e}. "
-            f"Logging to stdout only.\n"
+            "WARNING: Cannot write to log directory '{}': {}. "
+            "Logging to stdout only.\n".format(log_dir, e)
         )
 
     _initialised = True
@@ -136,13 +136,13 @@ def get_logger(name: str) -> logging.Logger:
     """
     Return a configured logger for the given name.
 
-    Call this once at module level in every Python module that needs logging:
+    Call once at module level in every Python module that needs logging:
 
         logger = get_logger(__name__)
 
-    The name appears in every log line and should identify the module clearly.
-    Using __name__ gives the full dotted module path, e.g. 'src.common.config_loader'.
-    For phase scripts, prefer explicit names like 'phase1.loader.sct_concept'.
+    Using __name__ gives the full dotted module path, for example
+    src.common.config_loader. This appears in every log line and identifies
+    where the message originated.
 
     Args:
         name: Logger name. Conventionally __name__ of the calling module.
@@ -157,23 +157,25 @@ def get_logger(name: str) -> logging.Logger:
 def get_phase_logger(phase: str, step: str, script: str) -> logging.Logger:
     """
     Return a logger named by phase, step, and script for pipeline scripts.
-    Produces log lines clearly identifying where in the pipeline a message
-    originated.
+
+    Produces log lines that clearly identify where in the pipeline a
+    message originated. Use this in pipeline scripts, not in utility
+    modules.
 
     Args:
-        phase:  Phase identifier, e.g. 'phase0', 'phase1'
-        step:   Step identifier, e.g. 'step0.3', 'step1.2'
-        script: Script name, e.g. 'load_concepts', 'validate_stage'
+        phase:  Phase identifier, e.g. phase0, phase1
+        step:   Step identifier, e.g. step0.3, step1.2
+        script: Script name, e.g. load_concepts, validate_stage
 
     Returns:
         A standard logging.Logger instance.
 
     Example:
-        logger = get_phase_logger('phase1', 'step1.2', 'load_concepts')
-        # Produces lines like:
-        # 2026-03-27T14:23:01 | INFO     | phase1.step1.2.load_concepts | ...
+        logger = get_phase_logger("phase1", "step1.2", "load_concepts")
+        logger.info("Starting load")
+        # Produces:
+        # 2026-03-30T14:23:01 | INFO     | phase1.step1.2.load_concepts | Starting load
     """
     _initialise_logging()
-    logger_name = f"{phase}.{step}.{script}"
+    logger_name = "{}.{}.{}".format(phase, step, script)
     return logging.getLogger(logger_name)
-```
