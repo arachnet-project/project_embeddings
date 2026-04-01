@@ -1,0 +1,4 @@
+2026-03-31T00:50:13 | DEBUG    | test.step0.3                             | DEBUG message — should NOT appear at INFO level
+2026-03-31T00:50:13 | INFO     | test.step0.3                             | INFO message — pipeline starting
+2026-03-31T00:50:13 | WARNING  | test.step0.3                             | WARNING message — skip_tables is non-empty
+2026-03-31T00:50:13 | ERROR    | test.step0.3                             | ERROR message — simulated load failure

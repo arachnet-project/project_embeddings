@@ -10,8 +10,12 @@ __pycache__/
 *.pyd
 *.so
 
+# Directories relating to the local machine
+tests/results/
+logs/
+
 # The unofficial docs
-docs/aux
+docs/aux/
 
 # Rsync control file, not needed with github
 syn.sh
