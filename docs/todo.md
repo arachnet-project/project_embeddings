@@ -1,28 +1,18 @@
-# Project Todo & Session Log — Arachnet Clinical Embeddings
+# Project Todo — Arachnet Clinical Embeddings
 
-**Document version:** 1.0
-**Date:** 2026-03-28
+**Version:** 1.4
+**Date:** 2026-04-06
 
-Update this document at the end of every working session.
-Commit it alongside any other changes from that session.
+Update and commit at the end of every working session.
 
 ---
 
-## How to use this document
+## Status keys
 
-**Done** — completed and committed items. Move from Pending to Done
-when committed to Git and tested.
-
-**Pending — code** — files that need to be written or finalised.
-
-**Pending — actions** — things you need to do: run tests, push,
-pull, verify, configure.
-
-**Pending — decisions** — open questions that need an answer before
-work can continue.
-
-Add new items at the top of each section so the most recent work
-is always visible first.
+Done — completed, tested, committed.
+Pending-code — files to write.
+Pending-action — things to do personally.
+Pending-decision — open questions blocking work.
 
 ---
 
@@ -30,44 +20,45 @@ is always visible first.
 
 ### Phase 0 — Foundation
 
-- `docs/git_workflow.md` — Git workflow for Ubuntu and OCI
-- `docs/directory_structure.md` — full directory structure with naming conventions
-- `tests/protocols/test_exceptions_py.md` — test protocol for exceptions.py
-- `tests/protocols/test_logger_py.md` — test protocol for logger.py
-- `tests/protocols/test_logger_sh.md` — test protocol for logger.sh
-- `tests/test_exceptions_py.py` — test script for exceptions.py
-- `tests/test_logger_py.py` — test script for logger.py
-- `tests/test_logger_sh.sh` — test script for logger.sh (replaces test_logger.sh)
-- `scripts/common/logger.sh` — Bash logging library, LC_ALL removed, Unix only
-- `docs/phase0_foundation.md` v1.4 — updated, Unix only, locale handling clarified
-- `src/common/exceptions.py` — exception hierarchy, complete
-- `docs/error_codes.md` — exit code reference, complete
-- `config/project.yaml` — complete with REQUIRED markers
-- `config/database.yaml` — complete with REQUIRED markers, 17 tables
-- `config/ingestion.yaml` — complete with REQUIRED markers
-- Verify actual directory structure on disk matches directory_structure.md, complete
+- `config/project.yaml` — complete, REQUIRED markers, dev path corrected 2026-04-02
+- `config/database.yaml` — complete, REQUIRED markers, 17 tables
+- `config/ingestion.yaml` — complete, REQUIRED markers
+- `src/common/exceptions.py` — tested Ubuntu and OCI
+- `src/common/logger.py` — tested Ubuntu and OCI
+- `scripts/common/logger.sh` — tested Ubuntu and OCI
+- `tests/test_exceptions_py.py` — passing
+- `tests/test_logger_py.py` — passing
+- `tests/test_logger_sh.sh` — passing
+- `tests/protocols/test_exceptions_py.md` — complete
+- `tests/protocols/test_logger_py.md` — complete
+- `tests/protocols/test_logger_sh.md` — complete
+- `docs/error_codes.md` — complete
+- `docs/phase0_foundation.md` — complete
+- `docs/directory_structure.md` — complete
+- `docs/git_workflow.md` — complete
+
+### Ongoing
+
+- `~/claude_chat.py` — working, used for all sessions
+
 ---
 
 ## Pending — code
 
-### Step 0.3 — Logging (in progress)
-
-- [ ] `src/common/logger.py` — draft produced, not yet reviewed or tested.
-      Review the draft before running test_logger_py.py.
-
-### Step 0.4 — Config loader (not started)
+### Step 0.4 — Config loader
+See `docs/todo_step_0_4.md` for detail.
 
 - [ ] `src/common/config_loader.py`
 - [ ] `tests/test_config_loader_py.py`
 - [ ] `tests/protocols/test_config_loader_py.md`
 
-### Step 0.5 — Database connection helper (not started)
+### Step 0.5 — Database connection helper
 
 - [ ] `src/common/db_connection.py`
 - [ ] `tests/test_db_connection_py.py`
 - [ ] `tests/protocols/test_db_connection_py.md`
 
-### Step 0.6 — Bash orchestrator (not started)
+### Step 0.6 — Bash orchestrator
 
 - [ ] `scripts/run.sh`
 - [ ] `tests/test_run_sh.sh`
@@ -75,109 +66,77 @@ is always visible first.
 
 ### Other
 
-- [ ] `LICENSE` — BUSL 1.1 licence file to be added to project root
-- [ ] `tests/results/.gitkeep` — create to establish results directory in Git
-- [ ] `.gitignore` — update with contents from directory_structure.md
-- [ ] `project.yaml` — add `software_license: BUSL-1.1` key
+- [ ] `LICENSE` — BUSL 1.1, project root
+- [ ] `tests/results/.gitkeep`
+- [ ] Add `software_license: BUSL-1.1` to `project.yaml`
 
 ---
 
-## Pending — actions (your side)
+## Pending — actions
 
-### Immediate — before first Git push
+### Before first Git push
 
-- [ ] Review `src/common/logger.py` draft
-- [ ] Run `python tests/test_exceptions_py.py` on Ubuntu
-- [ ] Run `python tests/test_exceptions_py.py` on OCI
-- [ ] Run `bash tests/test_logger_sh.sh` on Ubuntu (Pass 1, 2, 3)
-- [ ] Run `bash tests/test_logger_sh.sh` on OCI (Pass 1, 2, 3)
-- [ ] Run `python tests/test_logger_py.py` on Ubuntu (after reviewing logger.py)
-- [ ] Run `python tests/test_logger_py.py` on OCI
+- [ ] Create `tests/results/` and `.gitkeep`
+- [ ] Update `.gitignore` per `docs/directory_structure.md`
+- [ ] Commit: `feat: Phase 0 Steps 0.1-0.3 complete`
+- [ ] Push to GitHub, pull on OCI
 
-- [ ] Create `tests/results/` directory and `.gitkeep` file
-- [ ] Create `tests/protocols/` directory
-- [ ] Move downloaded files into correct locations per directory_structure.md
-- [ ] Update `.gitignore` with contents from directory_structure.md
-- [ ] First Git commit and push
+### Ubuntu setup
 
-### First push commit message suggestion
+- [ ] Set `.bashrc` — SNOMED_LOG_DIR, SNOMED_LOG_LEVEL, LC_ALL, venv
+- [ ] Create and populate venv with `requirements.txt`
+- [ ] Upgrade Python to 3.12 before Phase 1 (currently 3.10.12)
+- [ ] Always launch `claude_chat.py` from project root for correct /extract paths
 
-```
-feat: Phase 0 Steps 0.1-0.3 complete — YAML configs, exceptions, logger
-```
+### OCI setup
 
-### After first push
-
-- [ ] `git pull` on the other machine
-- [ ] Set `SNOMED_LOG_LEVEL=INFO` in `.bashrc` on both machines
-      (change from DEBUG used during testing)
-
-### Ubuntu setup (in progress)
-
-- [ ] Confirm project root path on Ubuntu
-      (update git_workflow.md if different from `/home/jan/project_embeddings`)
-- [ ] Set up `.bashrc` on Ubuntu per git_workflow.md
-- [ ] Create and populate venv on Ubuntu
-- [ ] Run all three test scripts on Ubuntu
-
-### OCI
-
-- [ ] Run all three test scripts on OCI
-- [ ] Confirm `TNS_ADMIN` path and add to `.bashrc` on OCI
+- [ ] Set `.bashrc` — all variables including DB passwords and TNS_ADMIN
+- [ ] Confirm TNS_ADMIN path, verify tnsnames.ora
+- [ ] Confirm Oracle accounts: snomed, snomed_stage, system
 
 ---
 
 ## Pending — decisions
 
-- [ ] UZIS response on Czech national extension — language code,
-      module ID, language refset SCTID, RF2 file list.
-      Needed to complete `national_extensions` section in ingestion.yaml.
-
-- [ ] Ubuntu project root path — confirm exact path before finalising
-      git_workflow.md and .bashrc instructions.
-
-- [ ] Python API script for terminal Claude access — Jan to write.
-      Will replace browser-based claude.ai for development work.
+- [ ] UZIS response — Czech extension: language code, module ID,
+      language refset SCTID, RF2 file list. Needed for `ingestion.yaml`.
 
 ---
 
 ## Session log
 
+### 2026-04-02
+
+- Restored session context after interruption
+- Sent all three YAML files to Claude for Step 0.4 work
+- Corrected dev base path in project.yaml: now /home/jan/project_embeddings
+- Renamed dev environment key from "dev" to "development"
+- Discussed todo structure — split into master + per-step files
+- Step 0.4 in progress
+
+### 2026-04-01
+
+- Fixed typo in logger.py: `_VALID_LOG_LEVEL:S` to `_VALID_LOG_LEVELS:`
+- Ran all three test scripts on Ubuntu — all passing
+- Clarified: DB env vars needed on OCI only
+
+### 2026-03-30
+
+- First Ubuntu test run (test_logger_sh.sh) — PASS
+- Fixed LC_ALL locale error — moved to calling scripts
+- Dropped macOS as dev platform, Unix/Linux only
+
 ### 2026-03-28
 
-- Resolved macOS locale error in logger.sh — LC_ALL moved out of
-  sourced library into calling scripts
-- Decided: Unix/Linux only — macOS dropped as dev platform
-- Mac Studio reserved for Phase 3 ML work only
-- Reorganised tests/ directory — protocols/ and results/ subdirectories
-- Established test script naming convention: test_<component>_<language>
-- Produced test scripts for logger.sh, logger.py, exceptions.py
-- Produced protocols for all three test scripts
-- Updated directory_structure.md with new tests/ structure and naming table
-- Updated git_workflow.md — two platforms only, LC_ALL in .bashrc
-
-### 2026-03-27
-
-- Produced logger.sh draft
-- Produced logger.py draft
-- Produced test_logger_sh.sh (now renamed test_logger_sh.sh)
-- Produced test protocol (now in tests/protocols/test_logger_sh.md)
-- Produced phase0_foundation.md v1.3
-- Produced git_workflow.md v1.0
-- Produced directory_structure.md v1.0
-- Jan ran test on macOS — locale error found and resolved
+- Reorganised tests/ with protocols/ and results/ subdirectories
+- Produced all test scripts and protocols
 
 ### 2026-03-26
 
-- Produced exceptions.py — complete
-- Produced error_codes.md — complete
-- Updated phase0_foundation.md — Step 0.2 marked complete
-- Decided: no config_schema.md — inline REQUIRED markers are authoritative
-- Decided: BUSL 1.1 software licence for project code
-- Decided: project targets Unix/Linux only
+- Produced exceptions.py and error_codes.md
+- Decided BUSL 1.1 licence
 
 ### 2026-03-21 to 2026-03-25
 
-- Completed Step 0.1 — all three YAML files with REQUIRED markers
-- Established architectural decisions (see project summary document)
-- Set up GitHub repo from macOS
+- Completed Step 0.1 — all three YAML files
+- Set up GitHub repo

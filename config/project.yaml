@@ -2,15 +2,15 @@
 # Global, phase-independent project configuration.
 # Loaded by config_loader.py before any phase script executes.
 # Uses OmegaConf for variable interpolation.
-# Last modified: 2026-03-26
+# Last modified: 2026-04-06
 
-active_environment: "production"    # REQUIRED — Switch to "dev" for local development
+active_environment: "development"    # REQUIRED — Switch to "production" for OCI
 
 metadata:
   created_by: "Jan Mura"
   created_on: "2026-03-21"
-  config_version: "1.1"
-  last_modified: "2026-03-23"
+  config_version: "1.2"
+  last_modified: "2026-04-06"
 
 project:
   name: "Arachnet Clinical Embeddings"  # REQUIRED
@@ -38,21 +38,21 @@ environments:
       rf2: "${environments.production.paths.data_volume}/rf2"   # REQUIRED
       parquet: "${environments.production.paths.data_volume}/parquet" # REQUIRED
 
-  dev:
-    # Local development — MacBook Pro M1 (primary)
+  development:
+    # Local development — Ubuntu (primary), MacBook Air Intel (secondary)
     paths:
-      base: "/Users/jan/arachnet/snomed/project_embeddings"     # REQUIRED
-      config: "${environments.dev.paths.base}/config"
-      src: "${environments.dev.paths.base}/src"
-      scripts: "${environments.dev.paths.base}/scripts"
-      docs: "${environments.dev.paths.base}/docs"
-      log: "${environments.dev.paths.base}/log"       # REQUIRED
-      venv: "${environments.dev.paths.base}/venv"
-      python: "${environments.dev.paths.venv}/bin/python"
+      base: "/home/jan/project_embeddings"           # REQUIRED
+      config: "${environments.development.paths.base}/config"
+      src: "${environments.development.paths.base}/src"
+      scripts: "${environments.development.paths.base}/scripts"
+      docs: "${environments.development.paths.base}/docs"
+      log: "${environments.development.paths.base}/log"       # REQUIRED
+      venv: "${environments.development.paths.base}/venv"
+      python: "${environments.development.paths.venv}/bin/python"
       # On dev machines data lives under the project root, no separate volume
-      data_volume: "${environments.dev.paths.base}/data"        # REQUIRED
-      rf2: "${environments.dev.paths.data_volume}/rf2"          # REQUIRED
-      parquet: "${environments.dev.paths.data_volume}/parquet"  # REQUIRED
+      data_volume: "${environments.development.paths.base}/data"        # REQUIRED
+      rf2: "${environments.development.paths.data_volume}/rf2"          # REQUIRED
+      parquet: "${environments.development.paths.data_volume}/parquet"  # REQUIRED
 
 infrastructure:
   production:
@@ -62,13 +62,13 @@ infrastructure:
     db: "Oracle Database 23ai"
     region: "eu-frankfurt-1"
     data_volume_mount: "/mnt/snomed_data"
-  dev:
+  development:
     primary:
-      description: "MacBook Pro M1 — primary development machine"
-      os: "macOS"
+      description: "Ubuntu — primary development machine"
+      os: "Ubuntu"
     secondary:
       description: "MacBook Air Intel — secondary development machine"
-      os: "Ubuntu"                  # Being configured, connectivity pending
+      os: "Ubuntu"
 
 includes:                           # REQUIRED — config loader will not know what to merge without this
   # Phase-specific config files, loaded and merged by config_loader.py
