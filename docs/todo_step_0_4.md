@@ -1,4 +1,3 @@
-
 # Step 0.4 — Config Loader Todo
 
 **Date started:** 2026-04-02
@@ -8,9 +7,9 @@
 
 ## Files to produce
 
-- [ ] `src/common/config_loader.py`
-- [ ] `tests/test_config_loader_py.py`
-- [ ] `tests/protocols/test_config_loader_py.md`
+- [x] `src/common/config_loader.py` — in progress
+- [ ] `tests/test_config_loader_py.py` — in progress
+- [ ] `tests/protocols/test_config_loader_py.md` — in progress
 
 ---
 
@@ -28,12 +27,30 @@ Six-part process:
    Module mode: return resolved OmegaConf config object.
 
 Mandatory keys: hardcoded list in loader (Option A).
-Lists: silently skipped in CLI export — not mappable to env vars.
+Lists: warn to stderr and skip in CLI export — not mappable to env vars.
 Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 ---
 
-## Mandatory keys (agreed list)
+## Resolved design decisions
+
+- CLI export skips list values with a warning to stderr.
+  Rationale: silent skip could cause hard-to-diagnose bugs if a caller
+  expects a key to appear in the exported environment and it does not.
+
+- cfg.paths points to cfg.environments[active_environment].paths.
+  This is a synthetic shortcut added by the loader after OmegaConf loads
+  the file. It is not present in the YAML itself.
+
+- _load_yaml_file is the single YAML loading function. Both the top-level
+  file and all included files are loaded through it.
+
+- _merge_includes iterates the includes list internally. load_config
+  calls it once and receives the fully merged config.
+
+---
+
+## Mandatory keys
 
 - `active_environment`
 - `project.name`
@@ -73,16 +90,36 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 ---
 
-## Open questions
+## Progress
 
-- [ ] Confirm: warn to stderr when skipping a list during CLI export,
-      or skip silently?
-- [ ] Confirm: cfg.paths shortcut points to
-      cfg.environments[active_environment].paths — is this correct?
+### Round 1 — complete 2026-04-10
 
----
+Functions written and tested:
+- _load_yaml_file(path)
+- _merge_includes(cfg)
 
-## Done
+Test result: 9 passed, 0 failed after bug fixes.
 
-Nothing yet.
-=== END FILE: docs/todo_step_0_4.md ===
+Bugs found and fixed:
+- yaml.parser.ParserError leaked through _load_yaml_file — fixed by
+  adding explicit except clause.
+- _merge_includes double-wrapped included configs — fixed by merging
+  included_cfg directly without wrapper.
+
+### Round 2 — pending
+
+Functions to write next:
+- _resolve_paths(cfg)
+- _resolve_interpolation(cfg)
+
+### Round 3 — pending
+
+Functions to write:
+- _validate_mandatory_keys(cfg)
+
+### Round 4 — pending
+
+Functions to write:
+- load_config() — public interface, CLI and module modes
+
+
