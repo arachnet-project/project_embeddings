@@ -4,45 +4,36 @@
 # Designed for use with screen readers (Orca, VoiceOver).
 #
 # Place this file in the project root: ~/project_embeddings/claude_chat.py
-# Always run from the project root with venv active:
+# Always run with venv active from the project root:
 #   cd ~/project_embeddings
 #   source venv/bin/activate
-#   python claude_chat.py --session myproject
+#   python claude_chat.py --session arachnet
 #
-# Transcripts are written to log/ under the project root (next to this file).
-# Session JSON files are stored in ~/.claude_sessions/
-# Extracted files are written relative to the project root (current dir).
+# See docs/claude_chat_howto.md for full usage guide.
 #
 # Requirements:
 #   pip install anthropic
-#   export ANTHROPIC_API_KEY="your-key-here"  # in .bashrc
+#   export ANTHROPIC_API_KEY="sk-ant-..."  # in ~/.bashrc
 #
 # Usage:
-#   python claude_chat.py                         # anonymous session
-#   python claude_chat.py --session myproject     # named persistent session
-#   python claude_chat.py --session myproject --file docs/project_summary.md
+#   python claude_chat.py                              # anonymous, Sonnet
+#   python claude_chat.py --session NAME               # named session
+#   python claude_chat.py --session NAME --model opus  # use Opus model
+#   python claude_chat.py --session NAME --file PATH   # load file as context
 #
-# Commands during chat:
-#   /quit or /q        -- save session and exit
-#   /clear             -- clear history, start fresh (session file kept)
-#   /save              -- save session and write transcript now
-#   /history           -- show number of turns and session name
-#   /sessions          -- list all saved sessions
-#   /file <path>       -- load file into next message
-#   /extract <path>    -- extract named file block from last transcript
+# Commands:
+#   /quit or /q       -- save JSON + transcript, exit
+#   /clear            -- clear conversation history
+#   /json             -- save session JSON only (mid-session checkpoint)
+#   /save             -- save transcript only (use before /extract)
+#   /save --last N    -- save last N turns to transcript
+#   /history          -- show turn count, session name, model
+#   /sessions         -- list all saved sessions
+#   /file <path>      -- load file into next message
+#   /extract <path>   -- extract file block from last transcript
+#                        writes to PROJECT_ROOT/path
 #
-# When asking Claude to produce a file, tell him to use this format:
-#   === BEGIN FILE: path/to/file.py ===
-#   ... content ...
-#   === END FILE: path/to/file.py ===
-# Then: /save  followed by  /extract path/to/file.py
-#
-# Error handling:
-#   Startup errors (missing API key, bad --file) exit cleanly.
-#   Session errors (bad /file path, save failure, API errors) are
-#   reported and the session continues. Context is never lost.
-#
-# Last modified: 2026-04-05
+# Last modified: 2026-04-11
 
 import anthropic
 import argparse
@@ -57,11 +48,13 @@ from pathlib import Path
 # Constants
 # ---------------------------------------------------------------------------
 
-MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 4096
+MODELS = {
+    "sonnet": "claude-sonnet-4-6",
+    "opus":   "claude-opus-4-6",
+}
+DEFAULT_MODEL = "sonnet"
+MAX_TOKENS = 8192
 
-# Project root is the directory containing this script.
-# Transcripts go to PROJECT_ROOT/log/
 PROJECT_ROOT = Path(__file__).resolve().parent
 LOG_DIR = PROJECT_ROOT / "log"
 SESSIONS_DIR = Path.home() / ".claude_sessions"
@@ -79,41 +72,36 @@ SYSTEM_PROMPT = (
     "... file content ...\n"
     "=== END FILE: path/to/filename.py ===\n\n"
     "Use the actual relative path from the project root as the filename. "
-    "This allows Jan to extract files from saved conversations automatically.\n\n"
+    "This allows Jan to extract files from saved conversations.\n\n"
     "When producing Python code: use 4-space indentation, include block "
     "markers (# --- function name --- and # --- end function name ---) "
-    "around all function definitions, and use .format() instead of f-strings "
-    "for Python 3.10 compatibility."
+    "around all function definitions, and use .format() not f-strings.\n\n"
+    "If a file is too long for one response, end with the comment "
+    "# CONTINUES IN NEXT RESPONSE inside the file content (before the "
+    "END FILE marker). Keep END FILE closed until the file is complete. "
+    "In the next response open a new BEGIN FILE marker and continue."
 )
 
 COMMANDS = (
-    "/quit", "/q", "/clear", "/save", "/history",
-    "/sessions", "/file", "/extract"
+    "/quit", "/q", "/clear", "/json", "/save",
+    "/history", "/sessions", "/file", "/extract"
 )
 
-# Tracks the last saved transcript file path for /extract
 _last_transcript_file = ""
 
 
 # ---------------------------------------------------------------------------
-# --- log_dir ---------------------------------------------------------------
+# --- ensure_log_dir --------------------------------------------------------
 # ---------------------------------------------------------------------------
 
 def ensure_log_dir() -> Path:
-    """
-    Ensure the project log directory exists.
-    Falls back to current working directory on failure.
-    Never exits -- transcript failure must not kill the session.
-    """
+    """Ensure project log/ directory exists. Falls back to cwd on failure."""
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         return LOG_DIR
     except OSError as e:
-        print(
-            "WARNING: Cannot create log dir {}: {}".format(LOG_DIR, e),
-            file=sys.stderr
-        )
-        print("WARNING: Transcripts will be written to current directory.")
+        print("WARNING: Cannot create log dir {}: {}".format(LOG_DIR, e),
+              file=sys.stderr)
         return Path.cwd()
 
 # --- end ensure_log_dir ----------------------------------------------------
@@ -129,18 +117,15 @@ def ensure_sessions_dir() -> Path:
         SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         return SESSIONS_DIR
     except OSError as e:
-        print(
-            "ERROR: Cannot create sessions directory {}: {}".format(
-                SESSIONS_DIR, e),
-            file=sys.stderr
-        )
+        print("ERROR: Cannot create sessions dir {}: {}".format(
+            SESSIONS_DIR, e), file=sys.stderr)
         return None
 
 # --- end ensure_sessions_dir -----------------------------------------------
 
 
 def session_path(name: str) -> Path:
-    """Return the full path for a named session JSON file."""
+    """Return full path for a named session JSON file."""
     safe = re.sub(r"[^a-zA-Z0-9._-]", "_", name)
     return SESSIONS_DIR / "{}.json".format(safe)
 
@@ -148,10 +133,7 @@ def session_path(name: str) -> Path:
 
 
 def load_session(name: str) -> list:
-    """
-    Load a named session from JSON.
-    Returns history list, or empty list if session does not exist.
-    """
+    """Load named session from JSON. Returns history list or empty list."""
     path = session_path(name)
     if not path.exists():
         print("Session '{}' not found -- starting fresh.".format(name))
@@ -160,25 +142,29 @@ def load_session(name: str) -> list:
         data = json.loads(path.read_text(encoding="utf-8"))
         history = data.get("history", [])
         saved_at = data.get("saved_at", "unknown")
+        model = data.get("model", "unknown")
         turns = len([t for t in history if t.get("role") != "_pending_file"])
-        print("Session '{}' loaded: {} turns, last saved {}.".format(
-            name, turns, saved_at))
+        print("Session '{}' loaded: {} turns, model {}, saved {}.".format(
+            name, turns, model, saved_at))
         return history
     except (json.JSONDecodeError, OSError) as e:
-        print(
-            "ERROR: Cannot load session '{}': {}".format(name, e),
-            file=sys.stderr
-        )
+        print("ERROR: Cannot load session '{}': {}".format(name, e),
+              file=sys.stderr)
         return []
 
 # --- end load_session -------------------------------------------------------
 
 
-def save_session(name: str, history: list) -> bool:
+def save_session_json(name: str, history: list, model: str) -> bool:
     """
-    Save current session to named JSON file in ~/.claude_sessions/
-    Returns True on success. Never exits -- session continues on failure.
+    Save full session history to JSON in ~/.claude_sessions/
+    Called by /json command and /quit.
+    Returns True on success. Never exits.
     """
+    if not name:
+        print("No session name set. Use --session NAME to enable JSON saving.")
+        return False
+
     if not ensure_sessions_dir():
         return False
 
@@ -186,7 +172,7 @@ def save_session(name: str, history: list) -> bool:
     data = {
         "session_name": name,
         "saved_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "model": MODEL,
+        "model": model,
         "project_root": str(PROJECT_ROOT),
         "turns": len(real_history),
         "history": real_history
@@ -198,20 +184,19 @@ def save_session(name: str, history: list) -> bool:
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8"
         )
+        print("JSON saved: {} ({} turns)".format(path, len(real_history)))
         return True
     except (PermissionError, OSError) as e:
-        print(
-            "ERROR: Cannot save session '{}': {}".format(name, e),
-            file=sys.stderr
-        )
-        print("Session continues -- not saved to disk.")
+        print("ERROR: Cannot save session '{}': {}".format(name, e),
+              file=sys.stderr)
+        print("Session continues -- not saved.")
         return False
 
-# --- end save_session -------------------------------------------------------
+# --- end save_session_json -------------------------------------------------
 
 
 def list_sessions() -> None:
-    """List all saved sessions with turn counts and save times."""
+    """List all saved sessions with turn counts and models."""
     if not ensure_sessions_dir():
         return
     files = sorted(SESSIONS_DIR.glob("*.json"))
@@ -222,9 +207,10 @@ def list_sessions() -> None:
     for f in files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            print("  {}  ({} turns, saved {})".format(
+            print("  {}  ({} turns, model {}, saved {})".format(
                 data.get("session_name", f.stem),
                 data.get("turns", "?"),
+                data.get("model", "?"),
                 data.get("saved_at", "?")))
         except (json.JSONDecodeError, OSError):
             print("  {} (unreadable)".format(f.stem))
@@ -238,9 +224,9 @@ def list_sessions() -> None:
 
 def read_file(path: str, exit_on_error: bool = False) -> str:
     """
-    Read a file and return its contents as a string.
-    exit_on_error=True: exit on failure (startup, no session to lose).
-    exit_on_error=False: print error, return empty string, session continues.
+    Read file and return contents as string.
+    exit_on_error=True: sys.exit on failure (startup only).
+    exit_on_error=False: print error, return empty string (session safe).
     """
     try:
         return Path(path).read_text(encoding="utf-8")
@@ -264,19 +250,27 @@ def read_file(path: str, exit_on_error: bool = False) -> str:
 # --- Transcript save -------------------------------------------------------
 # ---------------------------------------------------------------------------
 
-def save_transcript(history: list) -> str:
+def save_transcript(history: list, last_n: int = 0) -> str:
     """
-    Save conversation as plain text transcript to the project log/ directory.
+    Save conversation as plain text transcript to project log/ directory.
+    If last_n > 0, save only the last N real turns.
     Used by /extract to find file blocks.
-    Returns the transcript file path, or empty string on failure.
+    Returns transcript file path or empty string on failure.
     Never exits.
     """
     global _last_transcript_file
 
     real_turns = [t for t in history if t.get("role") != "_pending_file"]
+
     if not real_turns:
         print("Nothing to save yet -- have a conversation first.")
         return ""
+
+    if last_n > 0:
+        real_turns = real_turns[-last_n:]
+        label = " (last {} turns)".format(last_n)
+    else:
+        label = ""
 
     log_dir = ensure_log_dir()
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -287,7 +281,8 @@ def save_transcript(history: list) -> str:
             for turn in real_turns:
                 f.write("=== {} ===\n{}\n\n".format(
                     turn["role"].upper(), turn["content"]))
-        print("Transcript: {} ({} turns)".format(filename, len(real_turns)))
+        print("Transcript{}: {} ({} turns)".format(
+            label, filename, len(real_turns)))
         _last_transcript_file = str(filename)
         return str(filename)
     except (PermissionError, OSError) as e:
@@ -304,9 +299,9 @@ def save_transcript(history: list) -> str:
 
 def extract_file(target_path: str, transcript_file: str) -> None:
     """
-    Extract a named file block from a saved transcript and write to disk.
-    Path is relative to PROJECT_ROOT (where this script lives).
-    Prints the absolute path of the written file so you know where it went.
+    Extract named file block from transcript and write to disk.
+    Path is always relative to PROJECT_ROOT regardless of working directory.
+    Prints absolute path of written file so you know exactly where it went.
     Never exits.
     """
     if not transcript_file:
@@ -326,7 +321,8 @@ def extract_file(target_path: str, transcript_file: str) -> None:
     match = re.search(pattern, text, re.DOTALL)
 
     if not match:
-        print("ERROR: No block found for '{}' in transcript.".format(target_path))
+        print("ERROR: No block found for '{}' in transcript.".format(
+            target_path))
         print("Open the transcript in Vim and search for BEGIN FILE")
         print("to see the exact path Claude used, then retry.")
         print("Transcript: {}".format(transcript_file))
@@ -336,7 +332,6 @@ def extract_file(target_path: str, transcript_file: str) -> None:
     if content.startswith("\n"):
         content = content[1:]
 
-    # Write relative to PROJECT_ROOT so it always lands in the right place
     output_path = PROJECT_ROOT / target_path
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,9 +339,11 @@ def extract_file(target_path: str, transcript_file: str) -> None:
         print("Extracted: {}".format(output_path))
         print("Size: {} bytes".format(len(content)))
     except PermissionError:
-        print("ERROR: Permission denied: {}".format(output_path), file=sys.stderr)
+        print("ERROR: Permission denied: {}".format(output_path),
+              file=sys.stderr)
     except OSError as e:
-        print("ERROR: Cannot write {}: {}".format(output_path, e), file=sys.stderr)
+        print("ERROR: Cannot write {}: {}".format(output_path, e),
+              file=sys.stderr)
 
 # --- end extract_file ------------------------------------------------------
 
@@ -355,16 +352,21 @@ def extract_file(target_path: str, transcript_file: str) -> None:
 # --- API call --------------------------------------------------------------
 # ---------------------------------------------------------------------------
 
-def send_message(client: anthropic.Anthropic, history: list) -> str:
+def send_message(
+    client: anthropic.Anthropic,
+    history: list,
+    model: str
+) -> str:
     """
     Send conversation history to API. Returns response text or empty string.
-    Auth failure exits (not recoverable). All other errors return empty string.
+    Authentication failure exits -- not recoverable.
+    All other errors return empty string -- session continues.
     """
     api_history = [t for t in history if t.get("role") != "_pending_file"]
 
     try:
         response = client.messages.create(
-            model=MODEL,
+            model=model,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=api_history
@@ -373,13 +375,13 @@ def send_message(client: anthropic.Anthropic, history: list) -> str:
 
     except anthropic.AuthenticationError:
         print(
-            "\nERROR: Authentication failed. Check ANTHROPIC_API_KEY and restart.",
-            file=sys.stderr
-        )
+            "\nERROR: Authentication failed. Check ANTHROPIC_API_KEY.",
+            file=sys.stderr)
         sys.exit(1)
 
     except anthropic.RateLimitError:
-        print("\nERROR: Rate limit. Wait a moment and try again.", file=sys.stderr)
+        print("\nERROR: Rate limit. Wait a moment and try again.",
+              file=sys.stderr)
         return ""
 
     except anthropic.APIConnectionError:
@@ -406,45 +408,62 @@ def handle_command(
     command: str,
     history: list,
     client: anthropic.Anthropic,
-    session_name: str
+    session_name: str,
+    model: str
 ) -> tuple:
     """
-    Handle a slash command. Returns (continue_chat, history).
-    All errors caught and reported. Session never killed.
+    Handle a slash command entered by the user.
+    Returns (continue_chat, history).
+    All errors are caught and reported. Session is never killed.
     """
-    parts = command.strip().split(None, 1)
+    parts = command.strip().split()
     cmd = parts[0].lower()
-    arg = parts[1].strip() if len(parts) > 1 else ""
 
     # --- /quit or /q
     if cmd in ("/quit", "/q"):
         if session_name:
-            save_session(session_name, history)
-            print("Session '{}' saved.".format(session_name))
+            save_session_json(session_name, history, model)
+        save_transcript(history)
         print("Goodbye.")
         return False, history
 
     # --- /clear
     if cmd == "/clear":
-        label = session_name if session_name else "none"
-        print("Conversation cleared. Session name '{}' kept.".format(label))
+        print("Conversation cleared. Session '{}' kept.".format(
+            session_name if session_name else "none"))
         return True, []
+
+    # --- /json  (save session JSON only — mid-session checkpoint)
+    if cmd == "/json":
+        save_session_json(session_name, history, model)
+        return True, history
+
+    # --- /save  (save transcript only, with optional --last N)
+    if cmd == "/save":
+        last_n = 0
+        if "--last" in parts:
+            idx = parts.index("--last")
+            if idx + 1 < len(parts):
+                try:
+                    last_n = int(parts[idx + 1])
+                except ValueError:
+                    print("ERROR: --last requires a number. "
+                          "Example: /save --last 10")
+                    return True, history
+            else:
+                print("ERROR: --last requires a number. "
+                      "Example: /save --last 10")
+                return True, history
+        save_transcript(history, last_n=last_n)
+        return True, history
 
     # --- /history
     if cmd == "/history":
         real = sum(1 for t in history if t.get("role") != "_pending_file")
-        print("Turns: {}. Session: '{}'.".format(
-            real, session_name if session_name else "anonymous"))
-        return True, history
-
-    # --- /save
-    if cmd == "/save":
-        if session_name:
-            saved = save_session(session_name, history)
-            if saved:
-                print("Session '{}' saved to {}.".format(
-                    session_name, session_path(session_name)))
-        save_transcript(history)
+        print("Turns: {}. Session: '{}'. Model: {}.".format(
+            real,
+            session_name if session_name else "anonymous",
+            model))
         return True, history
 
     # --- /sessions
@@ -454,9 +473,10 @@ def handle_command(
 
     # --- /file
     if cmd == "/file":
-        if not arg:
+        if len(parts) < 2:
             print("Usage: /file <path>")
             return True, history
+        arg = parts[1]
         content = read_file(arg, exit_on_error=False)
         if not content:
             print("File not loaded. Session continues.")
@@ -466,15 +486,20 @@ def handle_command(
         if history and history[-1].get("role") == "_pending_file":
             history = history[:-1]
             print("Note: previous unsent file replaced.")
-        history.append({"role": "_pending_file", "content": content, "path": arg})
+        history.append({
+            "role": "_pending_file",
+            "content": content,
+            "path": arg
+        })
         return True, history
 
     # --- /extract
     if cmd == "/extract":
-        if not arg:
+        if len(parts) < 2:
             print("Usage: /extract <path>")
-            print("Files written relative to: {}".format(PROJECT_ROOT))
+            print("Writes to: {}/path".format(PROJECT_ROOT))
             return True, history
+        arg = parts[1]
         if not _last_transcript_file:
             print("No transcript saved yet. Run /save first.")
             return True, history
@@ -495,17 +520,20 @@ def handle_command(
 def chat_loop(
     client: anthropic.Anthropic,
     history: list,
-    session_name: str
+    session_name: str,
+    model: str
 ) -> None:
     """Main conversation loop."""
     label = session_name if session_name else "anonymous"
-    print("\nClaude API ({}) -- Arachnet [{}]".format(MODEL, label))
+    print("\nClaude API -- Arachnet [session: {}] [model: {}]".format(
+        label, model))
     print("Project root: {}".format(PROJECT_ROOT))
     print("Transcripts:  {}".format(LOG_DIR))
     if session_name:
         print("Sessions:     {}".format(SESSIONS_DIR))
-        print("Auto-saved after every response and on /quit.")
-    print("Commands: /quit  /clear  /save  /history  /sessions  /file <p>  /extract <p>")
+    print("Commands: /quit  /clear  /json  /save [--last N]  "
+          "/history  /sessions  /file <p>  /extract <p>")
+    print("See docs/claude_chat_howto.md for full guide.")
     print("=" * 60)
 
     while True:
@@ -515,11 +543,12 @@ def chat_loop(
             user_input = input().strip()
         except EOFError:
             if session_name:
-                save_session(session_name, history)
+                save_session_json(session_name, history, model)
+            save_transcript(history)
             print("\nGoodbye.")
             break
         except KeyboardInterrupt:
-            print("\nCtrl-C caught. Type /quit to exit and save.")
+            print("\nCtrl-C caught. Type /quit to save and exit.")
             continue
 
         if not user_input:
@@ -528,15 +557,16 @@ def chat_loop(
         if user_input.startswith("/"):
             try:
                 continue_chat, history = handle_command(
-                    user_input, history, client, session_name)
+                    user_input, history, client, session_name, model)
             except Exception as e:
-                print("ERROR: Unexpected error: {}".format(e), file=sys.stderr)
+                print("ERROR: Unexpected error in command: {}".format(e),
+                      file=sys.stderr)
                 continue
             if not continue_chat:
                 break
             continue
 
-        # --- Consume pending file
+        # --- Consume pending file if present
         pending_content = ""
         pending_path = ""
         if (history
@@ -546,7 +576,7 @@ def chat_loop(
             pending_path = history[-1].get("path", "file")
             history = history[:-1]
 
-        # --- Build message
+        # --- Build message content
         if pending_content:
             message_content = "Contents of {}:\n\n{}\n\n---\n\n{}".format(
                 pending_path, pending_content, user_input)
@@ -555,11 +585,11 @@ def chat_loop(
 
         history.append({"role": "user", "content": message_content})
 
-        print("\nCLAUDE:")
+        print("\nCLAUDE [{}]:".format(model))
         print("(sending...)")
 
         try:
-            response = send_message(client, history)
+            response = send_message(client, history, model)
         except Exception as e:
             print("ERROR: Unexpected error: {}".format(e), file=sys.stderr)
             history.pop()
@@ -569,8 +599,6 @@ def chat_loop(
         if response:
             print(response)
             history.append({"role": "assistant", "content": response})
-            if session_name:
-                save_session(session_name, history)
         else:
             history.pop()
 
@@ -584,22 +612,31 @@ def chat_loop(
 def main() -> None:
     """
     Parse arguments, initialise client, start chat loop.
-    Startup errors exit cleanly -- no session to preserve.
+    Startup errors exit cleanly -- no session to preserve yet.
     """
     parser = argparse.ArgumentParser(
         description="Terminal Claude API chat -- Arachnet project"
     )
     parser.add_argument(
         "--session", "-s",
-        help="Named session (loads existing or creates new)",
+        help="Named session: loads existing or creates new",
         metavar="NAME"
     )
     parser.add_argument(
         "--file", "-f",
-        help="Load this file as initial context",
+        help="Load this file as initial context before chat starts",
         metavar="PATH"
     )
+    parser.add_argument(
+        "--model", "-m",
+        help="Model: sonnet (default, fast) or opus (slower, more capable)",
+        choices=list(MODELS.keys()),
+        default=DEFAULT_MODEL,
+        metavar="MODEL"
+    )
     args = parser.parse_args()
+
+    model = MODELS[args.model]
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -608,8 +645,7 @@ def main() -> None:
             "Add to ~/.bashrc:\n"
             "  export ANTHROPIC_API_KEY=\"sk-ant-...\"\n"
             "Then: source ~/.bashrc",
-            file=sys.stderr
-        )
+            file=sys.stderr)
         sys.exit(1)
 
     client = anthropic.Anthropic(api_key=api_key)
@@ -628,18 +664,16 @@ def main() -> None:
             "content": "Project context:\n\n{}".format(content)
         })
         print("Loaded: {}".format(args.file))
-        print("Sending to Claude...")
-        response = send_message(client, history)
+        print("Sending to Claude [{}]...".format(model))
+        response = send_message(client, history, model)
         if response:
             history.append({"role": "assistant", "content": response})
-            print("\nCLAUDE:")
+            print("\nCLAUDE [{}]:".format(model))
             print(response)
-            if session_name:
-                save_session(session_name, history)
         else:
             print("WARNING: No response for initial file. Continuing.")
 
-    chat_loop(client, history, session_name)
+    chat_loop(client, history, session_name, model)
 
 # --- end main --------------------------------------------------------------
 

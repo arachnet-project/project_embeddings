@@ -1,6 +1,3 @@
-
-
-=== BEGIN FILE: docs/git_workflow.md ===
 # Git Workflow — Arachnet Clinical Embeddings
 
 **Document version:** 1.2

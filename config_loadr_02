@@ -7,9 +7,10 @@
 #   python tests/test_config_loader_py.py
 #
 # Round 1 covers: _load_yaml_file, _merge_includes.
+# Round 2 covers: _resolve_paths, _resolve_interpolation.
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-# Last modified: 2026-04-06
+# Last modified: 2026-04-10
 
 import sys
 from pathlib import Path
@@ -18,13 +19,19 @@ from pathlib import Path
 # Path setup
 # ---------------------------------------------------------------------------
 
-# Ensure project root is on sys.path so src.common imports resolve correctly.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from omegaconf import DictConfig
+from omegaconf import OmegaConf, DictConfig
 
-from src.common.config_loader import _load_yaml_file, _merge_includes, _CONFIG_DIR, _PROJECT_YAML
+from src.common.config_loader import (
+    _load_yaml_file,
+    _merge_includes,
+    _resolve_paths,
+    _resolve_interpolation,
+    _CONFIG_DIR,
+    _PROJECT_YAML,
+)
 from src.common.exceptions import SnomedConfigError
 
 
@@ -73,6 +80,25 @@ def _summarise() -> int:
         passed, failed, total))
     return 0 if failed == 0 else 1
 # --- end _summarise ---
+
+
+# --- _load_and_merge ---
+def _load_and_merge() -> DictConfig:
+    """
+    Shared helper for Round 2 tests. Loads and merges config so each
+    Round 2 test starts from a consistent merged state without repeating
+    the load and merge steps.
+
+    Returns:
+        Merged OmegaConf DictConfig ready for _resolve_paths.
+
+    Raises:
+        SnomedConfigError: If loading or merging fails.
+    """
+    cfg = _load_yaml_file(_PROJECT_YAML)
+    cfg = _merge_includes(cfg)
+    return cfg
+# --- end _load_and_merge ---
 
 
 # ---------------------------------------------------------------------------
@@ -266,36 +292,116 @@ def test_merge_includes_project_keys_preserved() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Round 2 — _resolve_paths and _resolve_interpolation
 # ---------------------------------------------------------------------------
 
-# --- main ---
-def main() -> None:
+# --- test_resolve_paths_cfg_paths_present ---
+def test_resolve_paths_cfg_paths_present() -> None:
     """
-    Run all test functions in sequence and print a summary.
+    After _resolve_paths, cfg.paths exists at the top level.
     """
-    print("=== test_config_loader_py.py — Round 1 ===")
-    print("")
-
-    # Round 1 — _load_yaml_file
-    print("--- _load_yaml_file ---")
-    test_load_yaml_file_project()
-    test_load_yaml_file_has_active_environment()
-    test_load_yaml_file_has_includes()
-    test_load_yaml_file_missing_file()
-    test_load_yaml_file_bad_yaml()
-    print("")
-
-    # Round 1 — _merge_includes
-    print("--- _merge_includes ---")
-    test_merge_includes_subtrees_present()
-    test_merge_includes_database_has_tns_alias()
-    test_merge_includes_ingestion_has_release()
-    test_merge_includes_project_keys_preserved()
-
-    sys.exit(_summarise())
-# --- end main ---
+    try:
+        cfg = _load_and_merge()
+        cfg = _resolve_paths(cfg)
+        if "paths" not in cfg:
+            _report("resolve_paths: cfg.paths present at top level",
+                    _FAIL, "paths key not found")
+            return
+        _report("resolve_paths: cfg.paths present at top level", _PASS)
+    except Exception as e:
+        _report("resolve_paths: cfg.paths present at top level",
+                _FAIL, "raised: {}".format(e))
+# --- end test_resolve_paths_cfg_paths_present ---
 
 
-if __name__ == "__main__":
-    main()
+# --- test_resolve_paths_base_present ---
+def test_resolve_paths_base_present() -> None:
+    """
+    After _resolve_paths, cfg.paths.base is present and non-empty.
+    """
+    try:
+        cfg = _load_and_merge()
+        cfg = _resolve_paths(cfg)
+        val = cfg.paths.get("base")
+        if not val:
+            _report("resolve_paths: cfg.paths.base present",
+                    _FAIL, "key absent or empty")
+            return
+        _report("resolve_paths: cfg.paths.base present", _PASS)
+    except Exception as e:
+        _report("resolve_paths: cfg.paths.base present",
+                _FAIL, "raised: {}".format(e))
+# --- end test_resolve_paths_base_present ---
+
+
+# --- test_resolve_paths_required_keys ---
+def test_resolve_paths_required_keys() -> None:
+    """
+    After _resolve_paths, cfg.paths contains all required path keys:
+    base, log, data_volume, rf2, parquet.
+    """
+    required = ["base", "log", "data_volume", "rf2", "parquet"]
+    try:
+        cfg = _load_and_merge()
+        cfg = _resolve_paths(cfg)
+        missing = [k for k in required if k not in cfg.paths]
+        if missing:
+            _report("resolve_paths: required path keys present",
+                    _FAIL, "missing: {}".format(", ".join(missing)))
+            return
+        _report("resolve_paths: required path keys present", _PASS)
+    except Exception as e:
+        _report("resolve_paths: required path keys present",
+                _FAIL, "raised: {}".format(e))
+# --- end test_resolve_paths_required_keys ---
+
+
+# --- test_resolve_paths_invalid_environment ---
+def test_resolve_paths_invalid_environment() -> None:
+    """
+    _resolve_paths raises SnomedConfigError if active_environment is
+    not a recognised value.
+    """
+    try:
+        cfg = _load_and_merge()
+        cfg = OmegaConf.merge(cfg,
+                              OmegaConf.create(
+                                  {"active_environment": "invalid_env"}))
+        _resolve_paths(cfg)
+        _report("resolve_paths: invalid environment raises SnomedConfigError",
+                _FAIL, "no exception raised")
+    except SnomedConfigError:
+        _report("resolve_paths: invalid environment raises SnomedConfigError",
+                _PASS)
+    except Exception as e:
+        _report("resolve_paths: invalid environment raises SnomedConfigError",
+                _FAIL, "wrong exception type: {}".format(type(e)))
+# --- end test_resolve_paths_invalid_environment ---
+
+
+# --- test_resolve_paths_missing_active_environment ---
+def test_resolve_paths_missing_active_environment() -> None:
+    """
+    _resolve_paths raises SnomedConfigError if active_environment key
+    is absent entirely.
+    """
+    try:
+        cfg = OmegaConf.create({
+            "environments": {
+                "development": {
+                    "paths": {"base": "/tmp"}
+                }
+            }
+        })
+        _resolve_paths(cfg)
+        _report("resolve_paths: missing active_environment raises "
+                "SnomedConfigError",
+                _FAIL, "no exception raised")
+    except SnomedConfigError:
+        _report("resolve_paths: missing active_environment raises "
+                "SnomedConfigError", _PASS)
+    except Exception as e:
+        _report("resolve_paths: missing active_environment raises "
+                "SnomedConfigError",
+                _
+

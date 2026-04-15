@@ -1,205 +1,75 @@
-
 # Test Protocol — config_loader.py
-# Arachnet Clinical Embeddings
+# tests/protocols/test_config_loader_py.md
+# =========================================
+# Records all test rounds for src/common/config_loader.py.
+# Last updated: 2026-04-14
 
-**Module under test:** src/common/config_loader.py
-**Test scripts:**
-  tests/test_config_loader_r1_py.py
-  tests/test_config_loader_r2_py.py
-**Document version:** 1.3
-**Date:** 2026-04-11
-**Status:** Rounds 1 and 2 complete — all tests passing
+## Test approach
 
----
-
-## How to run
-
-Activate the venv and run from the project root:
-
-    source venv/bin/activate
-    python tests/test_config_loader_r1_py.py
-    python tests/test_config_loader_r2_py.py
-
-Each script prints PASS or FAIL per test and a summary line at the end.
-Exit code 0 means all passed. Exit code 1 means at least one failed.
-
----
+Plain python scripts with _report and _summarise pattern.
+Run each round with: python tests/test_config_loader_rN_py.py
+No pytest. No conftest.py. Consistent with Steps 0.1 through 0.3.
 
 ## Round 1 — _load_yaml_file and _merge_includes
 
-**Test script:** tests/test_config_loader_r1_py.py
-**Functions covered:**
-- _load_yaml_file(path)
-- _merge_includes(cfg)
+File: tests/test_config_loader_r1_py.py
+Date: 2026-04-14
+Result: 9 passed, 0 failed
 
-**Preconditions:**
-- venv active with omegaconf installed
-- config/project.yaml, config/database.yaml, config/ingestion.yaml present
-- SNOMED_LOG_DIR set or ./log/ writable
+Tests:
+- load_yaml_file: valid file returns DictConfig
+- load_yaml_file: missing file raises FileNotFoundError
+- load_yaml_file: empty file raises ValueError
+- load_yaml_file: invalid YAML raises ValueError
+- load_yaml_file: non-mapping raises ValueError
+- merge_includes: no includes key leaves cfg unchanged
+- merge_includes: loads included file as sub-tree
+- merge_includes: removes includes key
+- merge_includes: missing file raises FileNotFoundError
 
----
+Bugs found: none
 
-### Test cases
+Notes:
+- _load_yaml_file raises FileNotFoundError and ValueError directly.
+  Does not raise SnomedConfigError. This is correct for Step 0.4.
+- _merge_includes takes config_dir as second parameter.
 
-**load_yaml_file: project.yaml returns DictConfig**
-What it checks: _load_yaml_file loads project.yaml and returns an
-OmegaConf DictConfig instance.
-Expected: PASS
-Result: PASS
+## Round 2 — _resolve_paths, _walk_tree, _resolve_interpolation
 
-**load_yaml_file: active_environment present**
-What it checks: The loaded project.yaml config contains the
-active_environment key.
-Expected: PASS
-Result: PASS
+File: tests/test_config_loader_r2_py.py
+Date: 2026-04-14
+Result: 9 passed, 0 failed
 
-**load_yaml_file: includes key present**
-What it checks: The loaded project.yaml config contains the includes key.
-Expected: PASS
-Result: PASS
+Tests:
+- resolve_paths: adds cfg.paths shortcut
+- resolve_paths: unknown environment raises KeyError
+- resolve_paths: no environments section raises KeyError
+- resolve_paths: missing paths section raises ValueError
+- walk_tree: flat dict yields all pairs
+- walk_tree: nested dict yields dot-separated keys
+- walk_tree: empty dict yields nothing
+- resolve_interpolation: plain values pass through
+- resolve_interpolation: valid reference passes
 
-**load_yaml_file: missing file raises SnomedConfigError**
-What it checks: Passing a nonexistent path raises SnomedConfigError,
-not a generic Python exception.
-Expected: PASS
-Result: PASS
+Bugs found: none
 
-**load_yaml_file: bad YAML raises SnomedConfigError**
-What it checks: A malformed YAML file raises SnomedConfigError.
-A temporary bad YAML file is created and removed automatically.
-Expected: PASS
-Result: PASS
-
-**merge_includes: subtrees present**
-What it checks: After _merge_includes, cfg contains both cfg.database
-and cfg.ingestion.
-Expected: PASS
-Result: PASS
-
-**merge_includes: cfg.database.tns_alias present**
-What it checks: cfg.database.tns_alias is present and non-empty after
-merge, confirming database.yaml was loaded and merged correctly.
-Expected: PASS
-Result: PASS
-
-**merge_includes: cfg.ingestion.release present**
-What it checks: cfg.ingestion.release is present after merge, confirming
-ingestion.yaml was loaded and merged correctly.
-Expected: PASS
-Result: PASS
-
-**merge_includes: project.yaml keys preserved**
-What it checks: active_environment and project.name are still present
-after the merge, confirming the merge did not overwrite the original
-project.yaml content.
-Expected: PASS
-Result: PASS
-
----
-
-### Round 1 summary
-
-First run: 6 passed, 3 failed. Two bugs identified and fixed.
-Bug 1: yaml.parser.ParserError leaked through _load_yaml_file.
-Fix: added explicit except clause for yaml.parser.ParserError.
-Bug 2: _merge_includes double-wrapped included configs, producing
-cfg.database.database.tns_alias instead of cfg.database.tns_alias.
-Fix: removed wrapper, merged included_cfg directly since each included
-YAML already has the correct top-level key.
-
-Rerun: 9 passed, 0 failed.
-Date: 2026-04-10
-Platform: Ubuntu
-Python version: 3.10.12
-Overall: PASS
-
----
-
-## Round 2 — _resolve_paths and _resolve_interpolation
-
-**Test script:** tests/test_config_loader_r2_py.py
-**Functions covered:**
-- _resolve_paths(cfg)
-- _resolve_interpolation(cfg)
-
-**Preconditions:**
-- Round 1 passing
-- venv active with omegaconf installed
-- config/project.yaml, config/database.yaml, config/ingestion.yaml present
-- SNOMED_LOG_DIR set or ./log/ writable
-
----
-
-### Test cases
-
-**resolve_paths: cfg.paths present at top level**
-What it checks: After _resolve_paths, a paths key exists at the top
-level of cfg.
-Expected: PASS
-Result: PASS
-
-**resolve_paths: cfg.paths.base present**
-What it checks: cfg.paths.base is present and non-empty after
-_resolve_paths.
-Expected: PASS
-Result: PASS
-
-**resolve_paths: required path keys present**
-What it checks: cfg.paths contains all required keys: base, log,
-data_volume, rf2, parquet.
-Expected: PASS
-Result: PASS
-
-**resolve_paths: invalid environment raises SnomedConfigError**
-What it checks: _resolve_paths raises SnomedConfigError if
-active_environment is set to an unrecognised value.
-Expected: PASS
-Result: PASS
-
-**resolve_paths: missing active_environment raises SnomedConfigError**
-What it checks: _resolve_paths raises SnomedConfigError if the
-active_environment key is absent entirely from the config.
-Expected: PASS
-Result: PASS
-
-**resolve_interpolation: cfg.paths.base is resolved**
-What it checks: After _resolve_interpolation, cfg.paths.base is a plain
-string with no interpolation syntax remaining.
-Expected: PASS
-Result: PASS
-
-**resolve_interpolation: cfg.paths.rf2 is resolved**
-What it checks: After _resolve_interpolation, cfg.paths.rf2 is a plain
-string that starts with the resolved base path, confirming derived path
-interpolation resolved correctly.
-Expected: PASS
-Result: PASS
-
-**resolve_interpolation: bad reference raises SnomedConfigError**
-What it checks: _resolve_interpolation raises SnomedConfigError if an
-interpolation expression references a key that does not exist.
-Expected: PASS
-Result: PASS
-
----
-
-### Round 2 summary
-
-First run: 8 passed, 0 failed. No bugs found.
-Date: 2026-04-11
-Platform: Ubuntu
-Python version: 3.10.12
-Overall: PASS
-
----
+Notes:
+- _resolve_paths derives valid environments dynamically from
+  cfg.environments keys. No hardcoded list.
+- cfg.paths shortcut uses OmegaConf.to_container with resolve=False
+  to preserve interpolation expressions as literals.
 
 ## Round 3 — _validate_mandatory_keys
 
-To be added after that function is implemented.
+File: tests/test_config_loader_r3_py.py
+Status: not yet run
 
----
+## Round 4 — load_config
 
-## Round 4 — Full end to end: load_config
+File: tests/test_config_loader_r4_py.py
+Status: not yet run
 
-To be added after the public function is complete.
+## Orchestrator
 
+File: tests/test_config_loader_py.py
+Status: not yet written — to be written after Round 4 passes

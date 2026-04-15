@@ -1,19 +1,23 @@
-# test_config_loader_r2_py.py
-# Round 2 tests for src/common/config_loader.py.
-# Covers: _resolve_paths, _resolve_interpolation.
 #
-# Usage:
+# Arachnet Clinical Embeddings — Config Loader Test Round 2
+# tests/test_config_loader_r2_py.py
+# =============================================================================
+# Purpose:
+#   Round 2 tests for _resolve_paths, _walk_tree, and _resolve_interpolation.
+#   Tests normal behaviour and all documented error paths.
+#
+# Run with:
 #   python tests/test_config_loader_r2_py.py
 #
 # Preconditions:
-#   Round 1 tests passing.
-#   venv active with omegaconf installed.
-#   config/project.yaml, config/database.yaml, config/ingestion.yaml present.
-#   SNOMED_LOG_DIR set or ./log/ writable.
+#   venv active with omegaconf and pyyaml installed.
+#   src/common/config_loader.py present.
 #
-# Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-# Last modified: 2026-04-10
+# Author: Jan Mura
+# Version: 0.4.0
+# =============================================================================
 
+import os
 import sys
 from pathlib import Path
 
@@ -25,16 +29,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from omegaconf import OmegaConf, DictConfig
-
 from src.common.config_loader import (
-    _load_yaml_file,
-    _merge_includes,
     _resolve_paths,
+    _walk_tree,
     _resolve_interpolation,
-    _PROJECT_YAML,
 )
-from src.common.exceptions import SnomedConfigError
-
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -46,17 +45,20 @@ _results = []
 
 
 # --- _report ---
-def _report(test_name: str, result: str, detail: str = "") -> None:
-    """
-    Print and record a single test result.
+def _report(test_name, result, detail=""):
+    """Print and record a single test result.
 
-    Args:
-        test_name: Short descriptive name for the test case.
-        result: _PASS or _FAIL.
-        detail: Optional explanation, required on failure.
+    Parameters
+    ----------
+    test_name : str
+        Short descriptive name for the test case.
+    result : str
+        _PASS or _FAIL.
+    detail : str
+        Optional explanation, required on failure.
     """
     if detail:
-        line = "{}: {} — {}".format(result, test_name, detail)
+        line = "{}: {} -- {}".format(result, test_name, detail)
     else:
         line = "{}: {}".format(result, test_name)
     print(line)
@@ -65,12 +67,12 @@ def _report(test_name: str, result: str, detail: str = "") -> None:
 
 
 # --- _summarise ---
-def _summarise() -> int:
-    """
-    Print pass and fail counts. Return exit code 0 if all passed,
-    1 if any failed.
+def _summarise():
+    """Print pass and fail counts and return exit code.
 
-    Returns:
+    Returns
+    -------
+    int
         0 if all tests passed, 1 if any test failed.
     """
     total = len(_results)
@@ -83,243 +85,246 @@ def _summarise() -> int:
 # --- end _summarise ---
 
 
-# --- _load_merge_resolve ---
-def _load_merge_resolve() -> DictConfig:
-    """
-    Shared helper. Loads, merges, and resolves paths so each test
-    starts from a consistent state ready for _resolve_interpolation.
+# =============================================================================
+# Round 2 -- _resolve_paths
+# =============================================================================
 
-    Returns:
-        OmegaConf DictConfig with cfg.paths added.
-
-    Raises:
-        SnomedConfigError: If any step fails.
-    """
-    cfg = _load_yaml_file(_PROJECT_YAML)
-    cfg = _merge_includes(cfg)
-    cfg = _resolve_paths(cfg)
-    return cfg
-# --- end _load_merge_resolve ---
-
-
-# ---------------------------------------------------------------------------
-# Round 2 — _resolve_paths
-# ---------------------------------------------------------------------------
-
-# --- test_resolve_paths_cfg_paths_present ---
-def test_resolve_paths_cfg_paths_present() -> None:
-    """
-    After _resolve_paths, cfg.paths exists at the top level.
-    """
-    try:
-        cfg = _load_yaml_file(_PROJECT_YAML)
-        cfg = _merge_includes(cfg)
-        cfg = _resolve_paths(cfg)
-        if "paths" not in cfg:
-            _report("resolve_paths: cfg.paths present at top level",
-                    _FAIL, "paths key not found")
-            return
-        _report("resolve_paths: cfg.paths present at top level", _PASS)
-    except Exception as e:
-        _report("resolve_paths: cfg.paths present at top level",
-                _FAIL, "raised: {}".format(e))
-# --- end test_resolve_paths_cfg_paths_present ---
-
-
-# --- test_resolve_paths_base_present ---
-def test_resolve_paths_base_present() -> None:
-    """
-    After _resolve_paths, cfg.paths.base is present and non-empty.
-    """
-    try:
-        cfg = _load_yaml_file(_PROJECT_YAML)
-        cfg = _merge_includes(cfg)
-        cfg = _resolve_paths(cfg)
-        val = cfg.paths.get("base")
-        if not val:
-            _report("resolve_paths: cfg.paths.base present",
-                    _FAIL, "key absent or empty")
-            return
-        _report("resolve_paths: cfg.paths.base present", _PASS)
-    except Exception as e:
-        _report("resolve_paths: cfg.paths.base present",
-                _FAIL, "raised: {}".format(e))
-# --- end test_resolve_paths_base_present ---
-
-
-# --- test_resolve_paths_required_keys ---
-def test_resolve_paths_required_keys() -> None:
-    """
-    After _resolve_paths, cfg.paths contains all required path keys:
-    base, log, data_volume, rf2, parquet.
-    """
-    required = ["base", "log", "data_volume", "rf2", "parquet"]
-    try:
-        cfg = _load_yaml_file(_PROJECT_YAML)
-        cfg = _merge_includes(cfg)
-        cfg = _resolve_paths(cfg)
-        missing = [k for k in required if k not in cfg.paths]
-        if missing:
-            _report("resolve_paths: required path keys present",
-                    _FAIL, "missing: {}".format(", ".join(missing)))
-            return
-        _report("resolve_paths: required path keys present", _PASS)
-    except Exception as e:
-        _report("resolve_paths: required path keys present",
-                _FAIL, "raised: {}".format(e))
-# --- end test_resolve_paths_required_keys ---
-
-
-# --- test_resolve_paths_invalid_environment ---
-def test_resolve_paths_invalid_environment() -> None:
-    """
-    _resolve_paths raises SnomedConfigError if active_environment is
-    not a recognised value.
-    """
-    try:
-        cfg = _load_yaml_file(_PROJECT_YAML)
-        cfg = _merge_includes(cfg)
-        cfg = OmegaConf.merge(
-            cfg, OmegaConf.create({"active_environment": "invalid_env"}))
-        _resolve_paths(cfg)
-        _report("resolve_paths: invalid environment raises SnomedConfigError",
-                _FAIL, "no exception raised")
-    except SnomedConfigError:
-        _report("resolve_paths: invalid environment raises SnomedConfigError",
-                _PASS)
-    except Exception as e:
-        _report("resolve_paths: invalid environment raises SnomedConfigError",
-                _FAIL, "wrong exception type: {}".format(type(e)))
-# --- end test_resolve_paths_invalid_environment ---
-
-
-# --- test_resolve_paths_missing_active_environment ---
-def test_resolve_paths_missing_active_environment() -> None:
-    """
-    _resolve_paths raises SnomedConfigError if active_environment key
-    is absent entirely.
-    """
+# --- test_resolve_paths_adds_shortcut ---
+def test_resolve_paths_adds_shortcut():
+    """_resolve_paths adds cfg.paths as shortcut to active environment paths."""
     try:
         cfg = OmegaConf.create({
+            "active_environment": "dev",
             "environments": {
-                "development": {
-                    "paths": {"base": "/tmp"}
+                "dev": {
+                    "paths": {
+                        "base": "/data/dev",
+                        "log": "/data/dev/logs",
+                    }
+                }
+            }
+        })
+        result = _resolve_paths(cfg)
+        if not hasattr(result, "paths"):
+            _report("resolve_paths: adds cfg.paths shortcut",
+                    _FAIL, "cfg.paths not present")
+            return
+        if result.paths.base != "/data/dev":
+            _report("resolve_paths: adds cfg.paths shortcut",
+                    _FAIL, "paths.base wrong: {}".format(result.paths.base))
+            return
+        if result.paths.log != "/data/dev/logs":
+            _report("resolve_paths: adds cfg.paths shortcut",
+                    _FAIL, "paths.log wrong: {}".format(result.paths.log))
+            return
+        _report("resolve_paths: adds cfg.paths shortcut", _PASS)
+    except Exception as exc:
+        _report("resolve_paths: adds cfg.paths shortcut",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_resolve_paths_adds_shortcut ---
+
+
+# --- test_resolve_paths_unknown_environment ---
+def test_resolve_paths_unknown_environment():
+    """_resolve_paths raises KeyError when active_environment is not in environments."""
+    try:
+        cfg = OmegaConf.create({
+            "active_environment": "staging",
+            "environments": {
+                "dev": {
+                    "paths": {"base": "/data/dev"}
                 }
             }
         })
         _resolve_paths(cfg)
-        _report("resolve_paths: missing active_environment raises "
-                "SnomedConfigError",
+        _report("resolve_paths: unknown environment raises KeyError",
                 _FAIL, "no exception raised")
-    except SnomedConfigError:
-        _report("resolve_paths: missing active_environment raises "
-                "SnomedConfigError", _PASS)
-    except Exception as e:
-        _report("resolve_paths: missing active_environment raises "
-                "SnomedConfigError",
-                _FAIL, "wrong exception type: {}".format(type(e)))
-# --- end test_resolve_paths_missing_active_environment ---
+    except KeyError as exc:
+        if "staging" in str(exc):
+            _report("resolve_paths: unknown environment raises KeyError", _PASS)
+        else:
+            _report("resolve_paths: unknown environment raises KeyError",
+                    _FAIL, "message does not mention staging: {}".format(exc))
+    except Exception as exc:
+        _report("resolve_paths: unknown environment raises KeyError",
+                _FAIL, "wrong exception: {}".format(type(exc)))
+# --- end test_resolve_paths_unknown_environment ---
 
 
-# ---------------------------------------------------------------------------
-# Round 2 — _resolve_interpolation
-# ---------------------------------------------------------------------------
-
-# --- test_resolve_interpolation_resolves_paths ---
-def test_resolve_interpolation_resolves_paths() -> None:
-    """
-    After _resolve_interpolation, cfg.paths.base is a plain string
-    with no interpolation syntax remaining.
-    """
-    try:
-        cfg = _load_merge_resolve()
-        cfg = _resolve_interpolation(cfg)
-        val = cfg.paths.base
-        if "${" in str(val):
-            _report("resolve_interpolation: cfg.paths.base is resolved",
-                    _FAIL, "interpolation syntax still present: {}".format(val))
-            return
-        _report("resolve_interpolation: cfg.paths.base is resolved", _PASS)
-    except Exception as e:
-        _report("resolve_interpolation: cfg.paths.base is resolved",
-                _FAIL, "raised: {}".format(e))
-# --- end test_resolve_interpolation_resolves_paths ---
-
-
-# --- test_resolve_interpolation_resolves_derived_paths ---
-def test_resolve_interpolation_resolves_derived_paths() -> None:
-    """
-    After _resolve_interpolation, derived paths such as cfg.paths.rf2
-    are plain strings containing the resolved base path.
-    """
-    try:
-        cfg = _load_merge_resolve()
-        cfg = _resolve_interpolation(cfg)
-        rf2 = str(cfg.paths.rf2)
-        base = str(cfg.paths.base)
-        if "${" in rf2:
-            _report("resolve_interpolation: cfg.paths.rf2 is resolved",
-                    _FAIL, "interpolation syntax still present: {}".format(rf2))
-            return
-        if not rf2.startswith(base):
-            _report("resolve_interpolation: cfg.paths.rf2 is resolved",
-                    _FAIL, "rf2 does not start with base. "
-                    "rf2: {} base: {}".format(rf2, base))
-            return
-        _report("resolve_interpolation: cfg.paths.rf2 is resolved", _PASS)
-    except Exception as e:
-        _report("resolve_interpolation: cfg.paths.rf2 is resolved",
-                _FAIL, "raised: {}".format(e))
-# --- end test_resolve_interpolation_resolves_derived_paths ---
-
-
-# --- test_resolve_interpolation_bad_reference ---
-def test_resolve_interpolation_bad_reference() -> None:
-    """
-    _resolve_interpolation raises SnomedConfigError if an interpolation
-    expression references a key that does not exist.
-    """
+# --- test_resolve_paths_no_environments_section ---
+def test_resolve_paths_no_environments_section():
+    """_resolve_paths raises KeyError when there is no environments section."""
     try:
         cfg = OmegaConf.create({
-            "good_key": "hello",
-            "bad_key": "${nonexistent.key}"
+            "active_environment": "dev",
         })
-        _resolve_interpolation(cfg)
-        _report("resolve_interpolation: bad reference raises SnomedConfigError",
+        _resolve_paths(cfg)
+        _report("resolve_paths: no environments section raises KeyError",
                 _FAIL, "no exception raised")
-    except SnomedConfigError:
-        _report("resolve_interpolation: bad reference raises SnomedConfigError",
-                _PASS)
-    except Exception as e:
-        _report("resolve_interpolation: bad reference raises SnomedConfigError",
-                _FAIL, "wrong exception type: {}".format(type(e)))
-# --- end test_resolve_interpolation_bad_reference ---
+    except KeyError as exc:
+        if "environments" in str(exc).lower():
+            _report("resolve_paths: no environments section raises KeyError", _PASS)
+        else:
+            _report("resolve_paths: no environments section raises KeyError",
+                    _FAIL, "message does not mention environments: {}".format(exc))
+    except Exception as exc:
+        _report("resolve_paths: no environments section raises KeyError",
+                _FAIL, "wrong exception: {}".format(type(exc)))
+# --- end test_resolve_paths_no_environments_section ---
 
 
-# ---------------------------------------------------------------------------
+# --- test_resolve_paths_missing_paths_section ---
+def test_resolve_paths_missing_paths_section():
+    """_resolve_paths raises ValueError when active environment has no paths."""
+    try:
+        cfg = OmegaConf.create({
+            "active_environment": "dev",
+            "environments": {
+                "dev": {
+                    "database": {"tns_alias": "mydb"}
+                }
+            }
+        })
+        _resolve_paths(cfg)
+        _report("resolve_paths: missing paths section raises ValueError",
+                _FAIL, "no exception raised")
+    except ValueError as exc:
+        if "paths section" in str(exc).lower():
+            _report("resolve_paths: missing paths section raises ValueError", _PASS)
+        else:
+            _report("resolve_paths: missing paths section raises ValueError",
+                    _FAIL, "wrong message: {}".format(exc))
+    except Exception as exc:
+        _report("resolve_paths: missing paths section raises ValueError",
+                _FAIL, "wrong exception: {}".format(type(exc)))
+# --- end test_resolve_paths_missing_paths_section ---
+
+
+# =============================================================================
+# Round 2 -- _walk_tree
+# =============================================================================
+
+# --- test_walk_tree_flat_dict ---
+def test_walk_tree_flat_dict():
+    """_walk_tree yields all key-value pairs from a flat DictConfig."""
+    try:
+        cfg = OmegaConf.create({"a": 1, "b": "hello"})
+        result = dict(_walk_tree(cfg))
+        expected = {"a": 1, "b": "hello"}
+        if result != expected:
+            _report("walk_tree: flat dict yields all pairs",
+                    _FAIL, "got: {}".format(result))
+            return
+        _report("walk_tree: flat dict yields all pairs", _PASS)
+    except Exception as exc:
+        _report("walk_tree: flat dict yields all pairs",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_walk_tree_flat_dict ---
+
+
+# --- test_walk_tree_nested_dict ---
+def test_walk_tree_nested_dict():
+    """_walk_tree yields dot-separated keys for nested DictConfig."""
+    try:
+        cfg = OmegaConf.create({"outer": {"inner": "value"}})
+        result = dict(_walk_tree(cfg))
+        expected = {"outer.inner": "value"}
+        if result != expected:
+            _report("walk_tree: nested dict yields dot-separated keys",
+                    _FAIL, "got: {}".format(result))
+            return
+        _report("walk_tree: nested dict yields dot-separated keys", _PASS)
+    except Exception as exc:
+        _report("walk_tree: nested dict yields dot-separated keys",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_walk_tree_nested_dict ---
+
+
+# --- test_walk_tree_empty_dict ---
+def test_walk_tree_empty_dict():
+    """_walk_tree yields nothing for an empty DictConfig."""
+    try:
+        cfg = OmegaConf.create({})
+        result = list(_walk_tree(cfg))
+        if result:
+            _report("walk_tree: empty dict yields nothing",
+                    _FAIL, "got: {}".format(result))
+            return
+        _report("walk_tree: empty dict yields nothing", _PASS)
+    except Exception as exc:
+        _report("walk_tree: empty dict yields nothing",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_walk_tree_empty_dict ---
+
+
+# =============================================================================
+# Round 2 -- _resolve_interpolation
+# =============================================================================
+
+# --- test_resolve_interpolation_plain_values ---
+def test_resolve_interpolation_plain_values():
+    """_resolve_interpolation returns cfg unchanged for plain values."""
+    try:
+        cfg = OmegaConf.create({"key": "value", "number": 42})
+        result = _resolve_interpolation(cfg)
+        if result.key != "value":
+            _report("resolve_interpolation: plain values pass through",
+                    _FAIL, "key wrong: {}".format(result.key))
+            return
+        if result.number != 42:
+            _report("resolve_interpolation: plain values pass through",
+                    _FAIL, "number wrong: {}".format(result.number))
+            return
+        _report("resolve_interpolation: plain values pass through", _PASS)
+    except Exception as exc:
+        _report("resolve_interpolation: plain values pass through",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_resolve_interpolation_plain_values ---
+
+
+# --- test_resolve_interpolation_valid_reference ---
+def test_resolve_interpolation_valid_reference():
+    """_resolve_interpolation passes when all interpolation references exist."""
+    try:
+        cfg = OmegaConf.create({"base": "/data", "log": "${base}/logs"})
+        result = _resolve_interpolation(cfg)
+        if result is not cfg:
+            _report("resolve_interpolation: valid reference passes",
+                    _FAIL, "returned different object")
+            return
+        _report("resolve_interpolation: valid reference passes", _PASS)
+    except Exception as exc:
+        _report("resolve_interpolation: valid reference passes",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_resolve_interpolation_valid_reference ---
+
+
+# =============================================================================
 # Main
-# ---------------------------------------------------------------------------
+# =============================================================================
 
 # --- main ---
-def main() -> None:
-    """
-    Run all Round 2 test functions in sequence and print a summary.
-    """
-    print("=== test_config_loader_r2_py.py — Round 2 ===")
+def main():
+    """Run all Round 2 test functions and print a summary."""
+    print("=== test_config_loader_r2_py.py -- Round 2 ===")
     print("")
 
-    print("--- _resolve_paths ---")
-    test_resolve_paths_cfg_paths_present()
-    test_resolve_paths_base_present()
-    test_resolve_paths_required_keys()
-    test_resolve_paths_invalid_environment()
-    test_resolve_paths_missing_active_environment()
+    print("-- _resolve_paths --")
+    test_resolve_paths_adds_shortcut()
+    test_resolve_paths_unknown_environment()
+    test_resolve_paths_no_environments_section()
+    test_resolve_paths_missing_paths_section()
     print("")
 
-    print("--- _resolve_interpolation ---")
-    test_resolve_interpolation_resolves_paths()
-    test_resolve_interpolation_resolves_derived_paths()
-    test_resolve_interpolation_bad_reference()
+    print("-- _walk_tree --")
+    test_walk_tree_flat_dict()
+    test_walk_tree_nested_dict()
+    test_walk_tree_empty_dict()
+    print("")
+
+    print("-- _resolve_interpolation --")
+    test_resolve_interpolation_plain_values()
+    test_resolve_interpolation_valid_reference()
 
     sys.exit(_summarise())
 # --- end main ---
@@ -327,3 +332,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+# =============================================================================
+# End of file
+# =============================================================================

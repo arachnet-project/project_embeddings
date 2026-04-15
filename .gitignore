@@ -13,6 +13,7 @@ __pycache__/
 # Directories relating to the local machine
 tests/results/
 logs/
+wrk/
 
 # Claude sessions
 conversation*.txt
