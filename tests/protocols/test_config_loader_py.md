@@ -2,12 +2,13 @@
 # tests/protocols/test_config_loader_py.md
 # =========================================
 # Records all test rounds for src/common/config_loader.py.
-# Last updated: 2026-04-14
+# Last updated: 2026-04-20
 
 ## Test approach
 
 Plain python scripts with _report and _summarise pattern.
 Run each round with: python tests/test_config_loader_rN_py.py
+Run full suite with: python tests/test_config_loader_py.py
 No pytest. No conftest.py. Consistent with Steps 0.1 through 0.3.
 
 ## Round 1 — _load_yaml_file and _merge_includes
@@ -62,14 +63,70 @@ Notes:
 ## Round 3 — _validate_mandatory_keys
 
 File: tests/test_config_loader_r3_py.py
-Status: not yet run
+Date: 2026-04-14
+Result: 5 passed, 0 failed
 
-## Round 4 — load_config
+Tests:
+- validate_mandatory_keys: all keys present returns cfg
+- validate_mandatory_keys: single missing key raises ValueError
+- validate_mandatory_keys: multiple missing keys all reported
+- validate_mandatory_keys: null value treated as missing
+- validate_mandatory_keys: error message has expected prefix
+
+Bugs found: none
+
+Notes:
+- All missing keys collected before raising so the error message
+  reports everything wrong in a single pass.
+- Null values treated as missing. OmegaConf.select returns None
+  for both absent keys and keys explicitly set to null.
+
+## Round 4 — load_config and _export_to_shell
 
 File: tests/test_config_loader_r4_py.py
-Status: not yet run
+Date: 2026-04-15
+Result: 9 passed, 0 failed
 
-## Orchestrator
+Tests:
+- load_config: returns DictConfig
+- load_config: cfg.paths shortcut present
+- load_config: cfg.database present
+- load_config: cfg.ingestion present
+- load_config: missing config_dir raises FileNotFoundError
+- load_config: missing mandatory key raises ValueError
+- export_to_shell: produces output
+- export_to_shell: output lines have KEY=value format
+- export_to_shell: skips list values
+
+Bugs found and fixed:
+- _merge_includes double-wrapping bug. Included files that already
+  have the subtree key at top level were being wrapped again, producing
+  cfg.database.database.tns_alias instead of cfg.database.tns_alias.
+  Fixed by checking whether subtree_key is already present in
+  included_cfg before wrapping.
+
+Notes:
+- load_config default config_dir resolved relative to this file using
+  _DEFAULT_CONFIG_DIR constant.
+- CLI export mode: python -m src.common.config_loader --export
+- List values skipped with WARNING to stderr in _export_to_shell.
+- Env var naming in CLI export: SNOMED_SECTION_KEY uppercase.
+
+## Orchestrator — Full Step 0.4 Suite
 
 File: tests/test_config_loader_py.py
-Status: not yet written — to be written after Round 4 passes
+Date: 2026-04-15
+Result: 32 passed, 0 failed
+
+Rounds included:
+- Round 1: 9 tests
+- Round 2: 9 tests
+- Round 3: 5 tests
+- Round 4: 9 tests
+
+Notes:
+- Orchestrator calls each test function directly rather than calling
+  each round's main() function. This is necessary because main() calls
+  sys.exit() which would terminate the process before subsequent rounds
+  run. Results accumulate in each module's own _results list and are
+  read back by the orchestrator for the combined summary.

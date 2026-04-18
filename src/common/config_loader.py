@@ -1,3 +1,4 @@
+# =============================================================================
 # Arachnet Clinical Embeddings — Configuration Loader
 # src/common/config_loader.py
 # =============================================================================
@@ -10,11 +11,15 @@
 #   from src.common.config_loader import load_config
 #   cfg = load_config()
 #
+#   CLI export mode:
+#   python -m src.common.config_loader --export
+#
 # Author: Jan Mura
 # Version: 0.4.0
 # =============================================================================
 
 import os
+import sys
 import yaml
 from omegaconf import OmegaConf, DictConfig
 
@@ -58,6 +63,14 @@ MANDATORY_KEYS = [
     "ingestion.logging.manifest_filename",
     "governance.license",
 ]
+
+# Default config directory relative to this file.
+_DEFAULT_CONFIG_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "config"
+)
+
+# Name of the root config file.
+_PROJECT_YAML = "project.yaml"
 
 
 # =============================================================================
@@ -126,9 +139,10 @@ def _load_yaml_file(path):
 def _merge_includes(cfg, config_dir):
     """Load files listed under the 'includes' key and merge them into cfg.
 
-    Each included file is loaded as a named sub-tree. The key used in the
-    merged config is the bare filename without extension, e.g. database.yaml
-    becomes cfg.database.
+    Each included file is loaded and merged into cfg. If the included file
+    already has the subtree key at its top level, it is merged directly.
+    If it does not, it is wrapped under the subtree key derived from the
+    filename without extension, e.g. database.yaml becomes cfg.database.
 
     The 'includes' key itself is removed from the merged result.
 
@@ -167,8 +181,12 @@ def _merge_includes(cfg, config_dir):
         # Derive the sub-tree key from the filename without extension.
         subtree_key = os.path.splitext(os.path.basename(filename))[0]
 
-        # Merge the included config as a named sub-tree.
-        base = OmegaConf.merge(base, OmegaConf.create({subtree_key: included_cfg}))
+        # If the included file already has the subtree key at its top level,
+        # merge it directly to avoid double-wrapping. Otherwise wrap it.
+        if subtree_key in included_cfg:
+            base = OmegaConf.merge(base, included_cfg)
+        else:
+            base = OmegaConf.merge(base, OmegaConf.create({subtree_key: included_cfg}))
 
     return base
 # --- end _merge_includes ---
@@ -299,4 +317,159 @@ def _resolve_interpolation(cfg):
 # --- end _resolve_interpolation ---
 
 
+# --- _validate_mandatory_keys ---
+def _validate_mandatory_keys(cfg: DictConfig) -> DictConfig:
+    """Check that all mandatory keys are present and non-null in cfg.
+
+    Iterates through MANDATORY_KEYS and uses OmegaConf.select to look up
+    each key. A key is considered missing if OmegaConf.select returns None,
+    which covers both absent keys and keys explicitly set to null.
+
+    All missing keys are collected before raising so that the error message
+    reports everything that is wrong in a single pass.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully merged configuration, including cfg.paths shortcut.
+
+    Returns
+    -------
+    DictConfig
+        The same cfg if all mandatory keys are present. The object is not
+        copied; this is a validation pass.
+
+    Raises
+    ------
+    ValueError
+        If one or more mandatory keys are missing or null. The error message
+        lists all missing keys.
+    """
+    missing = []
+
+    for key in MANDATORY_KEYS:
+        value = OmegaConf.select(cfg, key)
+        if value is None:
+            missing.append(key)
+
+    if missing:
+        raise ValueError(
+            "Configuration is missing mandatory keys: {}".format(missing)
+        )
+
+    return cfg
+# --- end _validate_mandatory_keys ---
+
+
+# --- _export_to_shell ---
+def _export_to_shell(cfg: DictConfig) -> None:
+    """Print all scalar config values as shell variable assignments.
+
+    Walks the full configuration tree and prints each scalar value as a
+    shell variable assignment on stdout. The variable name is derived from
+    the dot-separated key path, uppercased, with dots replaced by
+    underscores, and prefixed with SNOMED_.
+
+    List values are skipped with a warning to stderr.
+
+    Example output line:
+        SNOMED_DATABASE_TNS_ALIAS=mydb
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully merged and validated configuration.
+
+    Returns
+    -------
+    None
+    """
+    from omegaconf import ListConfig
+
+    for key, value in _walk_tree(cfg):
+        if isinstance(value, ListConfig):
+            sys.stderr.write(
+                "WARNING: skipping list value for key: {}\n".format(key)
+            )
+            continue
+
+        var_name = "SNOMED_" + key.upper().replace(".", "_")
+        sys.stdout.write("{}={}\n".format(var_name, value))
+# --- end _export_to_shell ---
+
+
+# =============================================================================
+# Public functions
+# =============================================================================
+
+# --- load_config ---
+def load_config(config_dir: str = None) -> DictConfig:
+    """Load, merge, and validate the full project configuration.
+
+    Loads project.yaml from config_dir, merges all included files as named
+    sub-trees, resolves the active environment paths shortcut, validates all
+    interpolation expressions, and checks that all mandatory keys are present
+    and non-null.
+
+    If config_dir is None, defaults to the config directory at the project
+    root, resolved relative to this file.
+
+    Parameters
+    ----------
+    config_dir : str, optional
+        Path to the directory containing project.yaml and included config
+        files. Defaults to None, which uses the project config directory.
+
+    Returns
+    -------
+    DictConfig
+        Fully merged, resolved, and validated configuration.
+
+    Raises
+    ------
+    FileNotFoundError
+        If project.yaml or any included file does not exist.
+    ValueError
+        If any config file is invalid YAML, empty, not a mapping, or if
+        mandatory keys are missing or null.
+    IOError
+        If any config file cannot be read.
+    KeyError
+        If active_environment is not set or not found in environments.
+    """
+    if config_dir is None:
+        config_dir = os.path.normpath(_DEFAULT_CONFIG_DIR)
+
+    project_yaml_path = os.path.join(config_dir, _PROJECT_YAML)
+
+    cfg = _load_yaml_file(project_yaml_path)
+    cfg = _merge_includes(cfg, config_dir)
+    cfg = _resolve_paths(cfg)
+    cfg = _resolve_interpolation(cfg)
+    cfg = _validate_mandatory_keys(cfg)
+
+    return cfg
+# --- end load_config ---
+
+
+# =============================================================================
+# CLI entry point
+# =============================================================================
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "--export":
+        try:
+            cfg = load_config()
+            _export_to_shell(cfg)
+            sys.exit(0)
+        except Exception as exc:
+            sys.stderr.write("ERROR: {}\n".format(exc))
+            sys.exit(1)
+    else:
+        sys.stderr.write(
+            "Usage: python -m src.common.config_loader --export\n"
+        )
+        sys.exit(1)
+# =============================================================================
+# End of file
 # =============================================================================
