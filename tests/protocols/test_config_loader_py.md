@@ -2,7 +2,7 @@
 # tests/protocols/test_config_loader_py.md
 # =========================================
 # Records all test rounds for src/common/config_loader.py.
-# Last updated: 2026-04-20
+# Last updated: 2026-04-15
 
 ## Test approach
 
@@ -118,6 +118,9 @@ File: tests/test_config_loader_py.py
 Date: 2026-04-15
 Result: 32 passed, 0 failed
 
+Ubuntu run: 2026-04-15, 32 passed, 0 failed
+OCI run: 2026-04-15, 32 passed, 0 failed
+
 Rounds included:
 - Round 1: 9 tests
 - Round 2: 9 tests
@@ -130,3 +133,5 @@ Notes:
   sys.exit() which would terminate the process before subsequent rounds
   run. Results accumulate in each module's own _results list and are
   read back by the orchestrator for the combined summary.
+- omegaconf and pyyaml must be installed via requirements.txt before
+  running on any environment.
