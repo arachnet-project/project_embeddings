@@ -1,35 +1,38 @@
 #!/usr/bin/env bash
-# logger.sh
-# Bash logging functions for Arachnet Clinical Embeddings.
-#
-# This file is a sourced library — not executed directly.
-# Source it at the top of every Bash script:
-#   source "$(dirname "$0")/../common/logger.sh"
-#
-# Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-#
-# This file does NOT set shell options (set -euo pipefail), traps,
-# or locale variables. Those are the responsibility of the calling
-# script. Setting them here would affect the sourcing shell in
-# unpredictable ways and is not the role of a sourced library.
-#
-# Environment variables read:
-#   SNOMED_LOG_DIR   — log directory. Default: ./log/
-#   SNOMED_LOG_LEVEL — DEBUG | INFO | WARNING | ERROR. Default: INFO
+# =============================================================================
+# Arachnet Clinical Embeddings — Bash logging library
+# scripts/common/logger.sh
+# =============================================================================
+# Purpose:
+#   Provides log_debug, log_info, log_warn, log_error functions for use
+#   in all Bash scripts. Writes to stdout and optionally to a log file.
 #
 # Usage:
-#   log_info  "phase1" "step1.2" "Starting RF2 load"
-#   log_warn  "phase1" "step1.2" "skip_tables is non-empty"
-#   log_error "phase1" "step1.2" "Load failed — exit code $?"
+#   source "${script_dir}/common/logger.sh"
 #
-# Last modified: 2026-03-28
+# This file is a sourced library — not executed directly.
+# Does NOT set shell options, traps, or locale variables.
+# Those are the responsibility of the calling script.
+#
+# Environment variables read:
+#   SNOMED_LOG_DIR   — log directory. Default: ./log
+#   SNOMED_LOG_LEVEL — DEBUG | INFO | WARNING | ERROR. Default: INFO
+#
+# Note: SNOMED_LOG_LEVEL is read once at source time. Changing it after
+#   sourcing this file has no effect. The level is locked for the lifetime
+#   of the calling script.
+#
+# Author: Jan Mura
+# Version: 1.1
+# =============================================================================
 
 # ---------------------------------------------------------------------------
 # Bash version check
 # Requires Bash 4.0 or later.
-# Oracle Linux 9 and Ubuntu ship Bash 5.x — this check is a safety net.
+# Note: exit here is intentional. This check runs at source time and
+# failure is unrecoverable — the calling shell cannot function without
+# the minimum required Bash version.
 # ---------------------------------------------------------------------------
-
 if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
     printf "ERROR: logger.sh requires Bash 4.0 or later.\n" >&2
     printf "Current version: %s\n" "${BASH_VERSION}" >&2
@@ -39,7 +42,6 @@ fi
 # ---------------------------------------------------------------------------
 # Resolve configuration from environment
 # ---------------------------------------------------------------------------
-
 _LOG_DIR="${SNOMED_LOG_DIR:-./log}"
 _LOG_LEVEL="${SNOMED_LOG_LEVEL:-INFO}"
 _LOG_FILE="${_LOG_DIR}/snomed.log"
@@ -49,7 +51,6 @@ _LOG_FILE="${_LOG_DIR}/snomed.log"
 # If creation fails, fall back to stdout only — do not abort.
 # Logging infrastructure failure must never suppress the original operation.
 # ---------------------------------------------------------------------------
-
 _LOG_TO_FILE=true
 if ! mkdir -p "${_LOG_DIR}" 2>/dev/null; then
     printf "WARNING: Cannot create log directory '%s'. Logging to stdout only.\n" \
@@ -61,9 +62,9 @@ fi
 # Level filtering
 # Map level name strings to numeric values for comparison.
 # Naming convention: functions prefixed with _ are internal to this file.
-# There are no true private functions in Bash — this is convention only.
 # ---------------------------------------------------------------------------
 
+# --- _level_value ---
 _level_value() {
     case "$1" in
         DEBUG)   echo 10 ;;
@@ -73,7 +74,11 @@ _level_value() {
         *)       echo 20 ;;   # unknown level — treat as INFO
     esac
 }
+# --- end _level_value ---
 
+# Note: _current_level_value is computed once at source time from
+# SNOMED_LOG_LEVEL. If SNOMED_LOG_LEVEL changes after this file is
+# sourced, the change has no effect. The level is locked here.
 _current_level_value=$(_level_value "${_LOG_LEVEL}")
 
 # ---------------------------------------------------------------------------
@@ -87,6 +92,7 @@ _current_level_value=$(_level_value "${_LOG_LEVEL}")
 #   $4 — message text
 # ---------------------------------------------------------------------------
 
+# --- _log_write ---
 _log_write() {
     local level="$1"
     local phase="$2"
@@ -123,11 +129,11 @@ _log_write() {
         }
     fi
 }
+# --- end _log_write ---
 
 # ---------------------------------------------------------------------------
 # Public functions
 # These are the intended interface for all calling scripts.
-# Naming convention only — Bash has no access control.
 #
 # All functions take three arguments:
 #   $1 — phase identifier, e.g. "phase1"
@@ -138,18 +144,25 @@ _log_write() {
 # cause an unbound variable error under set -u in the calling script.
 # ---------------------------------------------------------------------------
 
+# --- log_debug ---
 log_debug() {
     _log_write "DEBUG" "${1:-unknown}" "${2:-unknown}" "${3:-}"
 }
+# --- end log_debug ---
 
+# --- log_info ---
 log_info() {
     _log_write "INFO" "${1:-unknown}" "${2:-unknown}" "${3:-}"
 }
+# --- end log_info ---
 
+# --- log_warn ---
 log_warn() {
     _log_write "WARNING" "${1:-unknown}" "${2:-unknown}" "${3:-}"
 }
+# --- end log_warn ---
 
+# --- log_error ---
 log_error() {
     # Errors are written to both the log (via _log_write) and to stderr
     # directly, so they remain visible even if the caller has redirected
@@ -157,3 +170,4 @@ log_error() {
     _log_write "ERROR" "${1:-unknown}" "${2:-unknown}" "${3:-}"
     printf "ERROR: %s\n" "${3:-}" >&2
 }
+# --- end log_error ---

@@ -1,8 +1,8 @@
 # Arachnet Clinical Embeddings — Coding Conventions
 # docs/conventions.md
 # =========================================
-# Version: 1.3
-# Last updated: 2026-04-14
+# Version: 1.4
+# Last updated: 2026-04-20
 # Applies from: Step 0.4 onward. No retrofitting of earlier files.
 # Type annotations apply from _validate_mandatory_keys onward.
 # No retrofitting of earlier functions.
@@ -99,6 +99,61 @@ Use 2-space indentation.
 Use lowercase keys with underscores.
 Add a comment above each section explaining its purpose.
 Null values written as null, not ~.
+
+## SQL
+
+### File header
+Every SQL file must start with a header block like this:
+
+    -- =============================================================================
+    -- Arachnet Clinical Embeddings — <description>
+    -- <path/to/file.sql>
+    -- =============================================================================
+    -- Purpose:
+    --   <one or two sentences>
+    --
+    -- Run as:  <role or user, e.g. SYSDBA, snomed, snomed_stage>
+    -- Prereqs: <files that must have been run first, or "none">
+    --
+    -- Author: Jan Mura
+    -- Version: <version>
+    -- Last modified: <YYYY-MM-DD>
+    -- =============================================================================
+
+### Indentation
+Use 4 spaces. No tabs.
+
+### Keywords
+Write all SQL keywords in uppercase: CREATE, TABLE, GRANT, ALTER, SELECT.
+Write all Oracle built-in functions in uppercase: NVL, TO_DATE, SUBSTR.
+Write schema names, table names, column names, and constraint names
+in lowercase with underscores.
+
+### Naming
+Table names: lowercase with underscores, prefixed sct_ for SNOMED tables.
+Column names: lowercase with underscores.
+Constraint names: follow pattern <type>_<table>_<column(s)>,
+  for example: pk_sct_concept_id, fk_sct_description_concept_id,
+  idx_sct_concept_active.
+Tablespace names: uppercase with underscores, prefixed TBS_,
+  for example TBS_SNOMED, TBS_SNOMED_STAGE.
+Profile names: uppercase with underscores,
+  for example NO_EXPIRY_PROFILE.
+
+### Comments
+Use -- for all comments. No block comments.
+Add a section comment above each logical group of statements.
+Add an inline comment on the same line for any non-obvious clause.
+
+### Statement termination
+End every statement with a semicolon on its own line or at the end
+of the last clause. No slash (/) terminator except in SQLPlus scripts
+where required for PL/SQL blocks.
+
+### Passwords in SQL files
+Never store real passwords in SQL files.
+Use the placeholder CHANGEME_BEFORE_USE for any CREATE USER statement.
+Add a prominent comment warning the operator to change it immediately.
 
 ## Bash
 

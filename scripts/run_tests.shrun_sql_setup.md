@@ -1,3 +1,146 @@
+# Arachnet Clinical Embeddings — SQL Setup Runbook
+# docs/runbooks/run_sql_setup.md
+# =========================================
+# Version: 1.0
+# Last updated: 2026-04-20
+# Applies to: Step 0.5 — Database schema setup
+
+## Purpose
+
+This runbook describes how to run the one-time SQL setup scripts that
+prepare a fresh Oracle database instance for the Arachnet Clinical
+Embeddings project. These scripts create the tablespaces, schemas,
+profile, and grants required before Phase 1 ingestion can begin.
+
+These scripts are run manually by the operator as SYSDBA. They are not
+run by the Python pipeline.
+
+## Oracle client
+
+SQLcl version 24.4.1.0 Production Build 24.4.1.042.1221.
+Connection method: TNS. TNS alias: ARADB.
+TNS_ADMIN must be set in the environment before connecting.
+
+## Scripts in execution order
+
+All scripts are in sql/ddl/setup/. Run them in numeric order.
+
+    00_create_profile.sql     — Create NO_EXPIRY_PROFILE.
+                                Skip on OCI where it already exists.
+    01_create_tablespaces.sql — Create TBS_SNOMED and TBS_SNOMED_STAGE.
+    02_create_schemas.sql     — Create snomed and snomed_stage users.
+    03_grants.sql             — Grant privileges to both schemas.
+
+## Automated method (recommended)
+
+Use scripts/sql_setup.sh. It connects as SYSDBA over TNS, runs the
+scripts in order, and spools all output to a timestamped log file.
+
+Set required environment variables before running:
+
+    export SNOMED_ADMIN_DB_PASSWORD="your_sysdba_password"
+    export DB_TNS_ALIAS="ARADB"
+    export TNS_ADMIN="/path/to/tns/directory"
+
+On OCI where NO_EXPIRY_PROFILE already exists, run:
+
+    bash scripts/sql_setup.sh
+
+On a genuinely fresh instance where the profile does not exist, run:
+
+    RUN_00=true bash scripts/sql_setup.sh
+
+Output is spooled to log/sql_setup/sql_setup_YYYYMMDDTHHMMSS.log.
+Review the spool file after running to confirm no errors.
+
+## Manual method
+
+If running scripts manually via SQLcl, connect as SYSDBA:
+
+    sql system/"${SNOMED_ADMIN_DB_PASSWORD}"@ARADB as sysdba
+
+Inside SQLcl, spool output before running each script:
+
+    SPOOL /home/opc/project_embeddings/log/sql_setup/sql_setup_manual.log
+    SET FEEDBACK ON
+    SET ECHO ON
+    WHENEVER SQLERROR EXIT FAILURE
+
+    @/home/opc/project_embeddings/sql/ddl/setup/01_create_tablespaces.sql
+    @/home/opc/project_embeddings/sql/ddl/setup/02_create_schemas.sql
+    @/home/opc/project_embeddings/sql/ddl/setup/03_grants.sql
+
+    SPOOL OFF
+    EXIT
+
+## Verification queries
+
+After running all scripts, verify the setup by running these queries
+inside SQLcl connected as SYSDBA. All queries should return the expected
+rows shown.
+
+### Confirm tablespaces exist
+
+    SELECT tablespace_name, status, contents
+    FROM dba_tablespaces
+    WHERE tablespace_name IN ('TBS_SNOMED', 'TBS_SNOMED_STAGE')
+    ORDER BY tablespace_name;
+
+Expected: two rows, both ONLINE, both PERMANENT.
+
+### Confirm users exist
+
+    SELECT username, default_tablespace, temporary_tablespace, profile
+    FROM dba_users
+    WHERE username IN ('SNOMED', 'SNOMED_STAGE')
+    ORDER BY username;
+
+Expected: two rows.
+    SNOMED        TBS_SNOMED        TEMP    NO_EXPIRY_PROFILE
+    SNOMED_STAGE  TBS_SNOMED_STAGE  TEMP    NO_EXPIRY_PROFILE
+
+### Confirm profile assignment
+
+    SELECT username, profile
+    FROM dba_users
+    WHERE profile = 'NO_EXPIRY_PROFILE'
+    ORDER BY username;
+
+Expected: at minimum SNOMED, SNOMED_STAGE, SYS, SYSTEM.
+
+### Confirm grants
+
+    SELECT grantee, privilege
+    FROM dba_sys_privs
+    WHERE grantee IN ('SNOMED', 'SNOMED_STAGE')
+    ORDER BY grantee, privilege;
+
+Expected: multiple rows for each grantee including CREATE SESSION,
+CREATE TABLE, CREATE VIEW, CREATE SEQUENCE, CREATE PROCEDURE,
+UNLIMITED TABLESPACE.
+
+## After verification
+
+Change the placeholder passwords immediately:
+
+    ALTER USER snomed IDENTIFIED BY your_chosen_password;
+    ALTER USER snomed_stage IDENTIFIED BY your_chosen_password;
+
+Set the runtime environment variables on OCI:
+
+    export SNOMED_DB_PASSWORD="your_chosen_password"
+    export SNOMED_STAGE_DB_PASSWORD="your_chosen_password"
+
+These should be set in your shell profile or a sourced env file that
+is not committed to Git. See .gitignore — env_setup.sh is excluded.
+
+## Spool log location
+
+    log/sql_setup/sql_setup_YYYYMMDDTHHMMSS.log
+
+Log directory is created automatically by scripts/sql_setup.sh.
+Log files are not committed to Git.
+=== BEGIN FILE: docs/directory_structure.md ===
 # Directory Structure — Arachnet Clinical Embeddings
 
 **Document version:** 1.3
@@ -217,3 +360,4 @@ env_setup.sh
 This material includes SNOMED Clinical Terms (SNOMED CT) which is used
 by permission of SNOMED International. SNOMED and SNOMED CT are
 registered trademarks of SNOMED International.
+=== END FILE: docs/directory_structure.md ===
