@@ -12,7 +12,7 @@ __pycache__/
 
 # Directories relating to the local machine
 tests/results/
-logs/
+log/
 wrk/
 
 # Claude sessions
@@ -52,3 +52,5 @@ docs/.DS_Store
 # Misc
 *.bak
 *.tmp
+!log/.gitkeep
+
