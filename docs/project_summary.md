@@ -1,14 +1,12 @@
 # Arachnet Clinical Embeddings — Project Summary
 # docs/project_summary.md
 # =========================================
-# Version: 1.4
-# Last updated: 2026-05-01
+# Version: 1.5
+# Last updated: 2026-05-05
 # Purpose: Full project context for session handover and crash recovery.
-#          Covers project overview, conventions, Phase 0 progress,
-#          and immediate next actions.
-#          Updated 2026-05-01: 03_grants.sql reviewed and approved,
-#          run_sql_setup.sh rewrite agreed, Step 0.5 completion
-#          checklist finalised.
+#          Covers project overview, conventions, all Phase 0 steps,
+#          infrastructure, tooling, and immediate next actions.
+#          Complete history from Step 0.1 through session 2026-05-05.
 
 
 ## 1. Project overview
@@ -24,41 +22,45 @@ Licence: BUSL 1.1 (to be added to repository).
 
 ### Platforms
 
-Two active machines:
-
 Ubuntu on MacBook Air (hostname: jan-MacBookAir) — primary development
 and testing machine. MacBook Air hardware running Ubuntu Linux natively,
 no macOS, no virtual machine. Python venv, mocked database tests,
 Git origin. All development happens here first.
 
 OCI Frankfurt — Oracle Cloud Infrastructure. Production target.
-Oracle database currently at 23ai SE2, version 23.7.0.25.01.
+Oracle database: 23ai SE2, version 23.7.0.25.01.
 Real database tests run here with SNOMED_TEST_REAL_DB=true.
-26ai upgrade: confirmed available on OCI. Upgrade is a patch (release
-update), not a full database upgrade. No application re-certification
-required. All objects, grants, and profiles created under 23ai carry
-over unchanged. Run setup scripts on 23ai first, then apply 26ai patch.
 
-Mac Studio — Phase 3 ML computations only. Not a pipeline or development
-machine. Not relevant until Phase 3.
+26ai upgrade: confirmed available on OCI. Upgrade is a patch (release
+update), not a full database upgrade — internal version stays 23.0.0.0.0,
+only VERSION_FULL changes to 23.26.0.0.0. No application re-certification
+required. All objects, grants, profiles created under 23ai carry over
+unchanged. Run setup scripts on 23ai first, then apply 26ai patch.
+
+Mac Studio — Phase 3 ML computations only. Not relevant until Phase 3.
 
 
 ### Infrastructure
 
 Oracle Database on OCI: 23ai SE2, version 23.7.0.25.01.
 Managed DB System on separate VM in private VCN.
-No public IP on DB VM — access only from Linux VM via private connection string.
-TNS alias: ARADB. TNS_ADMIN must be set in environment before any script runs.
+No public IP on DB VM — access only from Linux VM via private subnet.
+TNS alias: ARADB. TNS_ADMIN must be set in environment before any
+script or connection attempt.
 
 Two application schemas: snomed (production) and snomed_stage (stage).
 Tablespaces: TBS_SNOMED and TBS_SNOMED_STAGE.
-Profile: NO_EXPIRY_PROFILE — no password expiry, 10 failed login attempts
-allowed before 1-hour auto-lockout (defence in depth).
+Profile: NO_EXPIRY_PROFILE — no password expiry, FAILED_LOGIN_ATTEMPTS=10,
+PASSWORD_LOCK_TIME=1/24 (1-hour auto-unlock, defence in depth).
 
-SYS and SYSTEM accounts: already assigned to NO_EXPIRY_PROFILE. Done.
+SYS and SYSTEM: already assigned to NO_EXPIRY_PROFILE. Done.
+
+Schemas snomed and snomed_stage: NOT YET CREATED on OCI.
+SQL setup scripts written, reviewed, approved at v1.2.
+Must be run via scripts/run_sql_setup.sh. See Section 5, Step 0.5.
 
 Linux VM (arachnetwebserver): Oracle Linux 9. Public IP 130.61.83.216.
-sudo dnf update run but aborted at confirmation prompt. Needs re-run with y.
+sudo dnf update was aborted at confirmation prompt. Needs re-run with y.
 Reboot needed after dnf update completes.
 
 OCI CLI version: 3.79.0 on Mac.
@@ -79,12 +81,14 @@ PyYAML for YAML parsing. Import as: import yaml. Catch yaml.YAMLError.
 Standard library only beyond the above. No frameworks.
 
 ### Oracle tooling
-SQLcl 24.4.1 or later available on OCI Linux VM.
-run_sql_setup.sh — wrapper script (scripts/run_sql_setup.sh) that sources
-logger.sh and functions.sh, validates env vars via require_var, injects
-credentials as DEFINE variables into SQL*Plus, and runs all four DDL
-setup scripts in order.
-Status: needs to be rewritten from run_setup.sh. See Section 5.
+SQLcl 24.4.1 or later — available on OCI Linux VM. Command: sql on PATH.
+scripts/run_sql_setup.sh — orchestrates all four DDL setup scripts.
+    Sources logger.sh and functions.sh.
+    Validates env vars via require_var.
+    Injects credentials as DEFINE variables into SQLcl heredoc.
+    Supports RUN_00=true flag to optionally include 00_create_profile.sql.
+    Do NOT set RUN_00 in .bashrc — use inline: RUN_00=true bash ...
+    Current version: 1.3 (bugs fixed 2026-05-05, see Section 5).
 
 ### Bash
 Bash 4.0 or later required. Ubuntu and OCI both ship Bash 5.x.
@@ -116,7 +120,7 @@ Live node references must not be assigned to new positions in the same tree.
 Use OmegaConf.to_container(resolve=False) to get a plain dict before
 wrapping in a new OmegaConf.create() call.
 Pin OmegaConf to exact version in requirements.txt.
-Import yaml directly (import yaml) not submodules.
+Import yaml directly (import yaml) not submodules (import yaml.parser).
 Catch yaml.YAMLError not yaml.parser.ParserError.
 
 
@@ -124,7 +128,7 @@ Catch yaml.YAMLError not yaml.parser.ParserError.
 
 project_embeddings/
     config/
-        project.yaml          — root config, includes database.yaml and ingestion.yaml
+        project.yaml          — root config, includes database.yaml, ingestion.yaml
         database.yaml         — DB connection, schemas, table registry (version 1.3)
         ingestion.yaml        — Phase 1 RF2 ingestion pipeline config
 
@@ -140,9 +144,17 @@ project_embeddings/
             logger.sh         — Bash logging library (version 1.1, complete)
             functions.sh      — shared Bash functions (version 1.1, complete)
         run_tests.sh          — run all tests (version 1.1, complete)
-        run_sql_setup.sh      — DDL setup runner (to be written, replaces run_setup.sh)
-        run_setup.sh          — OLD name, to be deleted after run_sql_setup.sh written
+        run_sql_setup.sh      — DDL setup runner (version 1.3, complete)
+        test_infrastructure_sh.sh — OCI resource OCID verification (fixed 2026-05-05)
         run.sh                — main pipeline orchestrator (Step 0.7, pending)
+
+    arc/                      — project CLI automation tool (new 2026-05-05)
+        arc_lib.sh            — shared library for all arc commands
+        arc_send.sh           — arc-send: rsync outbox to remote machine
+        arc_get.sh            — arc-get: receive files or pull from remote
+        arc_openlink.sh       — arc-openlink: open URL from inbox link file
+        arc_status.sh         — arc-status: show transfer directory state
+    arc_setup.sh              — arc CLI installer (run once per machine)
 
     tests/
         test_exceptions_py.py          — 45 tests, passing
@@ -178,7 +190,7 @@ project_embeddings/
         error_codes.md
         git_workflow.md
         phase0_foundation.md        — version 1.5
-        project_summary.md          — this file, version 1.4
+        project_summary.md          — this file, version 1.5
         todo.md                     — needs reconstruction after crash
         todo_step_0_5.md            — Step 0.5 SQL setup todo
         todo_step_0_6.md            — Step 0.6 db_connection todo, to be written
@@ -187,10 +199,10 @@ project_embeddings/
         uzis_correspondence.md      — UZIS email analysis and meeting agenda
         uzis_meeting_prep.md        — meeting script for UZIS online meeting
         runbooks/
-            run_sql_setup.md        — verify reflects run_sql_setup.sh
+            run_sql_setup.md        — verify reflects run_sql_setup.sh v1.3
 
-    log/                            — not committed to Git
-    venv/                           — not committed to Git
+    log/                            — NOT committed to Git (.gitignore)
+    venv/                           — NOT committed to Git (.gitignore)
     claude_chat.py                  — Claude API terminal interface (project root)
     requirements.txt
     syn.sh                          — rsync sync script
@@ -200,16 +212,14 @@ project_embeddings/
 
 ## 4. Environment variables
 
-All Oracle credentials managed via environment variables in ~/.bashrc.
-Never commit passwords to version control.
+All credentials managed via environment variables in ~/.bashrc on each
+machine. Never commit passwords or keys to version control.
 
-Required variables on OCI and Ubuntu:
-
-    # Oracle admin credentials — SYSDBA access for setup scripts only
+    # Oracle admin credentials — SYSDBA, used by run_sql_setup.sh only
     export ORACLE_SYS_USER="SYS"
     export ORACLE_SYS_PASSWORD=""               # fill in on each machine
 
-    # Application schema credentials
+    # Application schema credentials — used by run_sql_setup.sh
     export ORACLE_SNOMED_USER="SNOMED"
     export ORACLE_SNOMED_PASSWORD=""            # fill in on each machine
 
@@ -219,12 +229,13 @@ Required variables on OCI and Ubuntu:
     # TNS alias — used by run_sql_setup.sh and db_connection.py
     export ORACLE_TNS_ALIAS="ARADB"
 
-    # Python db_connection.py reads these variable names from config:
-    export SNOMED_DB_PASSWORD=""                # same value as ORACLE_SNOMED_PASSWORD
-    export SNOMED_STAGE_DB_PASSWORD=""          # same value as ORACLE_SNOMED_STAGE_PASSWORD
-    export SNOMED_ADMIN_DB_PASSWORD=""          # same value as ORACLE_SYS_PASSWORD
+    # db_connection.py reads these names from database.yaml config.
+    # Same values as above, different variable names.
+    export SNOMED_DB_PASSWORD=""                # same as ORACLE_SNOMED_PASSWORD
+    export SNOMED_STAGE_DB_PASSWORD=""          # same as ORACLE_SNOMED_STAGE_PASSWORD
+    export SNOMED_ADMIN_DB_PASSWORD=""          # same as ORACLE_SYS_PASSWORD
 
-    # OCI compartment and resource OCIDs
+    # OCI resource OCIDs
     export OCI_NETWORK_COMPARTMENT_OCID=""
     export OCI_DB_COMPARTMENT_OCID=""
     export OCI_LINUX_COMPARTMENT_OCID=""
@@ -235,11 +246,16 @@ Required variables on OCI and Ubuntu:
     export OCI_DB_SYSTEM_OCID=""
     export OCI_BASTION_OCID=""
 
-    # Logging
+    # Logging — path differs per machine
     export SNOMED_LOG_DIR="/home/jan/project_embeddings/log"   # Ubuntu
-    export SNOMED_LOG_DIR="/home/opc/project_embeddings/log"   # OCI
+    # export SNOMED_LOG_DIR="/home/opc/project_embeddings/log" # OCI
 
-Claude API alias (Ubuntu only):
+    # Anthropic API key — Ubuntu only, for claude_chat.py
+    # CRITICAL: Never commit. Key from log/transcript_2026-05-02_20-24-14.txt
+    # has been COMPROMISED and must be revoked. See Section 9.
+    export ANTHROPIC_API_KEY=""                 # fill in new key after revocation
+
+    # Claude alias — Ubuntu only
     alias claude="cd /home/jan/project_embeddings && \
         source venv/bin/activate && python claude_chat.py"
 
@@ -247,114 +263,168 @@ Claude API alias (Ubuntu only):
 ## 5. Phase 0 status
 
 Step 0.1 — YAML configuration files — Complete.
+    config/project.yaml, config/database.yaml, config/ingestion.yaml.
+    active_environment: development. Environment key: development (not dev).
+    Dev base path: /home/jan/project_embeddings.
+    database.yaml version 1.3 — DB connection, schema credential env var
+    names (not values), table registry.
+
 Step 0.2 — Error handling — Complete.
+    src/common/exceptions.py written and tested (45 tests passing).
+    Exception hierarchy:
+        SnomedBaseError          base class
+        SnomedConfigError        exit code 1
+        SnomedDBConnectionError  exit code 2
+        SnomedDDLError           exit code 3
+        SnomedLoadError          exit code 4
+        SnomedValidationError    exit code 5
+
 Step 0.3 — Logging utility — Complete.
-Step 0.4 — Configuration loader — Complete. 32 tests passing on Ubuntu.
+    src/common/logger.py written and tested (13 tests passing).
+    scripts/common/logger.sh written and tested (version 1.1).
+    Log format: YYYY-MM-DDTHH:MM:SS | LEVEL    | name | message
 
-Step 0.5 — SQL database setup — In progress.
+Step 0.4 — Configuration loader — Complete. 32 tests passing.
+    src/common/config_loader.py — four rounds of testing.
+    Functions:
+        _load_yaml_file, _merge_includes, _resolve_paths, _walk_tree,
+        _resolve_interpolation, _validate_mandatory_keys,
+        _export_to_env, load_config(config_dir=None)
+    Key decisions:
+        MANDATORY_KEYS hardcoded as Python list (Option A).
+        Lists warn to stderr in CLI export mode.
+        cfg.paths uses OmegaConf.to_container(resolve=False) hard copy.
+        load_config accepts optional config_dir for testability.
 
-    Completed:
-    - All four SQL scripts reviewed, corrected, approved at version 1.2.
-    - scripts/common/logger.sh version 1.1 complete.
-    - scripts/common/functions.sh version 1.1 complete.
-    - scripts/run_tests.sh version 1.1 complete.
-    - tests/test_functions_sh.sh version 1.2, 10 tests passing.
-    - Full test suite 6 scripts all passing on Ubuntu.
+Step 0.5 — SQL database setup — Scripts complete, NOT yet run on OCI.
+
+    SQL scripts (all version 1.2, reviewed and approved):
+    Target: Oracle 23ai / 26ai. No 19c fallback anywhere.
+
+    00_create_profile.sql:
+        Creates NO_EXPIRY_PROFILE.
+        FAILED_LOGIN_ATTEMPTS=10, PASSWORD_LOCK_TIME=1/24.
+        Skip on OCI — profile already exists.
+        Use RUN_00=true only on a fresh database.
+
+    01_create_tablespaces.sql:
+        Creates TBS_SNOMED and TBS_SNOMED_STAGE.
+        Explicit EXTENT MANAGEMENT LOCAL AUTOALLOCATE,
+        SEGMENT SPACE MANAGEMENT AUTO.
+
+    02_create_schemas.sql:
+        Creates users SNOMED and SNOMED_STAGE.
+        Credentials via &&ORACLE_SNOMED_USER / &&ORACLE_SNOMED_PASSWORD
+        SQL*Plus substitution variables — no hardcoded credentials.
+
+    03_grants.sql:
+        GRANT CREATE SESSION, TABLE, VIEW, SEQUENCE, PROCEDURE to snomed.
+        GRANT CREATE SESSION, TABLE, SEQUENCE to snomed_stage only
+            (ingestion target — no VIEW or PROCEDURE).
+        QUOTA UNLIMITED on assigned tablespace per schema.
+        QUOTA 0 ON SYSTEM — blocks accidental system tablespace writes.
+        Cross-schema SELECT (Oracle 23ai/26ai schema-level privilege):
+            GRANT SELECT ANY TABLE ON SCHEMA snomed_stage TO snomed;
+        Covers all current and future tables automatically.
+
+    run_sql_setup.sh (version 1.3 — four bugs fixed 2026-05-05):
+        Sources logger.sh and functions.sh.
+        require_var checks all nine credential and path variables.
+        Verifies tnsnames.ora present at TNS_ADMIN.
+        run_ddl_script() connects via SQLcl, injects DEFINE variables.
+
+        Bugs fixed in v1.3:
+        1. || true on SQLcl call swallowed exit code — removed.
+        2. WHENEVER SQLERROR EXIT SQL.SQLCODE moved before CONNECT.
+        3. EXIT SUCCESS changed to EXIT 0.
+        4. DEFINE names corrected to match &&ORACLE_SNOMED_USER syntax.
+        5. Verification hint: schema grant is in dba_schema_privs,
+           not dba_sys_privs.
+
+        Usage:
+            bash scripts/run_sql_setup.sh
+            RUN_00=true bash scripts/run_sql_setup.sh   # fresh DB only
+
+    Bash infrastructure (all complete):
+        scripts/common/logger.sh version 1.1
+        scripts/common/functions.sh version 1.1
+            Key fix: return 1 not exit 1 in require_var and require_command.
+            Counter defaults initialised at source time.
+        scripts/run_tests.sh version 1.1
+        tests/test_functions_sh.sh version 1.2 — 10 tests passing.
+        Full test suite: 6 scripts, all passing on Ubuntu.
+
+    OCI infrastructure test script (scripts/test_infrastructure_sh.sh):
+        Test 9 (DB OCID retrieval) fixed 2026-05-05.
+        Root cause: --all not supported in OCI CLI 3.79.0 for
+        oci db database list.
+        Fix: --all replaced with --limit 10, Python loop filters
+        by lifecycle-state == AVAILABLE.
 
     Remaining to close Step 0.5:
 
-    1. Write scripts/run_sql_setup.sh.
-       Replaces scripts/run_setup.sh.
-       Must source logger.sh and functions.sh.
-       Must use require_var for all prerequisite checks.
-       Must use log_info and log_error, no bare echo.
-       Must use ORACLE_TNS_ALIAS not OCI_DB_CONNECTION_STRING.
-       Must support RUN_00=true flag to optionally include 00_create_profile.sql.
-       Must delete scripts/run_setup.sh after replacement is confirmed.
+    A. Fill passwords into ~/.bashrc on OCI and Ubuntu.
+       ORACLE_SYS_PASSWORD, ORACLE_SNOMED_PASSWORD,
+       ORACLE_SNOMED_STAGE_PASSWORD and SNOMED_* equivalents.
 
-    2. Fix comment in 00_create_profile.sql header.
-       Remove incorrect statement about SYS/SYSTEM assignment being done
-       at initial setup. Replace with: SYS and SYSTEM already assigned to
-       NO_EXPIRY_PROFILE — no action needed.
+    B. Run sudo dnf update on OCI Linux VM, then reboot.
+       SSH to 130.61.83.216.
+       sudo dnf update   (type y)
+       sudo reboot
+       Reconnect after 3-5 minutes.
 
-    3. Run SQL setup scripts on OCI.
-       SSH to arachnetwebserver (130.61.83.216).
-       Confirm TNS_ADMIN set and tnsnames.ora present.
-       Confirm passwords set in .bashrc.
-       Run: bash scripts/run_sql_setup.sh
-       Verify after run:
+    C. Deploy test_infrastructure_sh.sh fix to OCI and re-run.
+       bash scripts/test_infrastructure_sh.sh
+       All 10 checks should pass.
+
+    D. Run SQL setup scripts on OCI.
+       bash scripts/run_sql_setup.sh
+       Verify:
            SELECT username, default_tablespace, profile
            FROM dba_users
            WHERE username IN ('SNOMED', 'SNOMED_STAGE');
+
            SELECT * FROM dba_sys_privs
            WHERE grantee IN ('SNOMED', 'SNOMED_STAGE')
            ORDER BY grantee, privilege;
 
-    4. Assign SYS and SYSTEM to NO_EXPIRY_PROFILE — ALREADY DONE.
-       No action needed.
+           SELECT * FROM dba_schema_privs
+           WHERE grantee = 'SNOMED';
 
-    5. Run sudo dnf update on OCI Linux VM.
-       SSH to 130.61.83.216.
-       Run: sudo dnf update
-       Type y when prompted.
-       Run: sudo reboot
-       Wait 3-5 minutes, reconnect.
-
-    6. Upgrade Python to 3.12.x on Ubuntu.
-       Deactivate venv first: deactivate
-       Run:
+    E. Upgrade Python to 3.12.x on Ubuntu.
            sudo apt update
            sudo apt install -y software-properties-common
            sudo add-apt-repository -y ppa:deadsnakes/ppa
            sudo apt update
            sudo apt install -y python3.12 python3.12-venv python3.12-dev
-           python3.12 --version
            cd ~/project_embeddings
            rm -rf venv
            python3.12 -m venv venv
            source venv/bin/activate
-           python --version
            pip install --upgrade pip
            pip install -r requirements.txt
            pip install anthropic
        Rerun: bash scripts/run_tests.sh
-       Confirm all 6 test scripts pass on Python 3.12.
-       Update docs/conventions.md to reference Python 3.12.
+       Confirm all 6 scripts pass on Python 3.12.
+       Update docs/conventions.md Python version to 3.12.
 
-    7. Apply 26ai patch via OCI console.
-       Run precheck first in OCI console.
-       Take manual backup before patching.
-       Disable automatic backups during patch window.
+    F. Apply 26ai patch via OCI console.
+       Precheck first. Manual backup. Disable auto-backups.
        After patch: verify TNS_ADMIN and tnsnames.ora unchanged.
-       Confirm connectivity: run test query via SQLcl.
-       No application re-certification needed.
-       Confirm oracledb thin mode connection parameters unchanged.
+       Run test query via SQLcl to confirm connectivity.
 
-    8. Run full test suite on OCI after Oracle upgrade.
-       Pull latest from Git on OCI.
-       Run: bash scripts/run_tests.sh
-       Confirm all passing with SNOMED_TEST_REAL_DB=false.
+    G. Commit and close Step 0.5.
+       Message: fix: SQL scripts v1.2, run_sql_setup.sh v1.3,
+       Bash infrastructure, Python 3.12, 26ai patch confirmed.
 
-    9. Commit and close Step 0.5.
-       Commit message covers: SQL scripts v1.2, run_sql_setup.sh,
-       Bash infrastructure corrections, test_functions_sh.sh,
-       Python 3.12 upgrade, Oracle 26ai upgrade confirmed.
-
-Step 0.6 — Database connection helper — Pending.
-    src/common/db_connection.py not yet written.
-    tests/test_db_connection_py.py is an empty placeholder.
-    Design fully agreed — see Section 6.
-    Blocked on: Step 0.5 completion.
-
-Step 0.7 — Bash pipeline orchestrator — Pending.
-    scripts/run.sh not yet written.
-    Depends on all previous steps.
+Step 0.6 — Database connection helper — Pending. Blocked on Step 0.5.
+Step 0.7 — Bash pipeline orchestrator — Pending. Blocked on Step 0.6.
 
 
 ## 6. db_connection.py design (Step 0.6)
 
 File location: src/common/db_connection.py
-All Oracle communication in the project goes through this module exclusively.
+All Oracle communication goes through this module exclusively.
 Uses oracledb thin mode only. No Oracle client installation needed.
 No code outside this module imports oracledb directly.
 
@@ -363,7 +433,7 @@ Module-level constants:
     _RETRY_WAIT_SECONDS = 2
     _DDL_LOG_MAX_LENGTH = 200
 
-Imports needed:
+Imports:
     import time
     import oracledb
     from contextlib import contextmanager
@@ -375,10 +445,10 @@ Imports needed:
 Functions:
 
 _get_credentials(cfg, schema) -> tuple(user, password, tns_alias)
-    Internal. Extracts user, resolves password from env var named in config.
+    Internal. Resolves password from env var named in config.
     Valid schemas: production, stage, admin.
-    Raises SnomedConfigError for unknown schema name.
-    Raises SnomedDBConnectionError if password env var not set or empty.
+    Raises SnomedConfigError for unknown schema.
+    Raises SnomedDBConnectionError if env var not set or empty.
     Never logs the password value.
 
 get_connection(cfg, schema) -> oracledb.Connection
@@ -387,122 +457,291 @@ get_connection(cfg, schema) -> oracledb.Connection
     Retries once after _RETRY_WAIT_SECONDS on failure.
     Raises SnomedDBConnectionError after two failures.
 
-open_connection(cfg, schema) -> context manager yielding oracledb.Connection
+open_connection(cfg, schema) -> context manager -> oracledb.Connection
     Public. Context manager wrapping get_connection.
-    Use with: with open_connection(cfg, "production") as conn:
     Connection closed automatically on exit, even on exception.
-    No commit on exception exit — caller handles commit/rollback.
+    No commit on exception — caller handles commit/rollback.
     Implemented with @contextmanager decorator.
 
 execute_ddl(conn, sql) -> None
     Public. Executes single DDL statement.
-    Logs full SQL at DEBUG level (truncated to _DDL_LOG_MAX_LENGTH).
+    Logs SQL at DEBUG (truncated to _DDL_LOG_MAX_LENGTH chars).
     Raises SnomedDDLError on failure with Oracle error code.
-    DDL in Oracle implicitly commits — no explicit commit needed.
+    DDL implicitly commits — no explicit commit needed.
 
-execute_batch(conn, sql, data, batch_size) -> tuple(rows_loaded, batches_processed)
-    Public. Bulk INSERT via executemany in batches of batch_size rows.
-    Does NOT commit — caller commits after all batches complete.
+execute_batch(conn, sql, data, batch_size)
+        -> tuple(rows_loaded, batches_processed)
+    Public. Bulk INSERT via executemany in batches of batch_size.
+    Does NOT commit — caller commits after all batches.
     Rolls back and raises SnomedLoadError on any batch failure.
-    Returns (rows_loaded, batches_processed) for manifest logging.
 
-test_connection(cfg, schema="production") -> True or raises SnomedDBConnectionError
-    Public. Executes SELECT 1 FROM DUAL to verify connectivity.
+test_connection(cfg, schema="production") -> True
+    Public. Executes SELECT 1 FROM DUAL.
     Returns True on success.
     Raises SnomedDBConnectionError on failure — never returns False.
-    Used by run.sh health checks.
 
 get_pool(cfg, schema) -> raises NotImplementedError
-    Public stub. Connection pooling is Phase 3/4 work.
-    Raises NotImplementedError with clear message explaining deferral.
+    Public stub. Connection pooling deferred to Phase 3/4.
 
-Testing strategy:
-    Ubuntu: mock oracledb.connect with unittest.mock. Tests logic only.
-    OCI: real Oracle connection via SNOMED_TEST_REAL_DB=true.
-
-
-## 7. UZIS correspondence
-
-Czech SNOMED CT national extension contact: MUDr. Irena Molinari, UZIS.
-Department of Standardisation contact: Mr. Zvolský.
-Online meeting arranged — preparation at docs/uzis_meeting_prep.md.
-Full analysis at docs/uzis_correspondence.md.
-
-Key confirmed points from UZIS:
-    RF2 package follows SNOMED International standards.
-    Language refset SCTID included in distribution package.
-    Czech descriptions load into sct_description with languageCode=cs.
-    Arachnet to be added to release notification list.
-
-Open questions for meeting:
-    ModuleId stability — UZIS said it may differ per release.
-    Likely confusion with effectiveTime. Confirm stable fixed SCTID.
-    Complete refset inventory beyond language acceptability refset.
-    Release schedule relative to SNOMED International.
-    Package access for development.
-    Namespace process for future Arachnet extension authoring.
+Testing:
+    Ubuntu: mock oracledb.connect with unittest.mock.
+    OCI: real connection via SNOMED_TEST_REAL_DB=true.
 
 
-## 8. claude_chat.py
+## 7. Arc project CLI
 
-Location: ~/project_embeddings/claude_chat.py (project root)
+Cross-machine automation CLI built 2026-05-05. Provides named commands
+as symlinks in ~/bin for repeated cross-machine workflows. Uses rsync
+over SSH. OCI Linux VM acts as bridge between Ubuntu and MacOS.
+
+Files:
+    arc_setup.sh              installer — run once on each machine
+    arc/arc_lib.sh            shared library (config, SSH opts, Orca check)
+    arc/arc_send.sh           rsync ~/transfer/outbox to remote inbox
+    arc/arc_get.sh            list inbox or pull from remote
+    arc/arc_openlink.sh       open URL from inbox/link/link.txt in Firefox
+    arc/arc_status.sh         show transfer directory state
+
+Transfer directory (created by arc_setup.sh on each machine):
+    ~/transfer/
+        outbox/               stage files here before arc-send
+        outbox/link/link.txt  put magic links here
+        inbox/                files arrive here from remote
+        inbox/link/link.txt   link file, opened by arc-openlink
+
+Config: ~/.arc_config (created by arc_setup.sh):
+    ARC_UBUNTU_HOST="jan@130.61.83.216"
+    ARC_MACOS_HOST="jan@<macos-ip>"
+
+Setup (run once on each machine):
+    bash arc_setup.sh
+    export PATH="$HOME/bin:$PATH"   # add to ~/.bashrc if not present
+
+Claude magic link workflow:
+    On MacOS:
+        echo "https://claude.ai/magic-link/..." \
+            > ~/transfer/outbox/link/link.txt
+        arc-send ubuntu
+    On Ubuntu:
+        arc-get
+        arc-openlink    # starts Orca if needed, opens Firefox with URL
+
+arc-openlink always starts Orca before Firefox if not already running.
+Prints reminder to press Enter before typing in any form field.
+
+Status: written, not yet committed or tested end-to-end.
+Commit after setup is tested on both machines.
+
+
+## 8. Firefox and Orca accessibility
+
+Platform: Ubuntu on MacBook Air. Screen reader: Orca. Browser: Firefox ESR.
+
+Root cause of login form focus loss:
+    Orca Browse mode intercepts single keypresses as navigation commands.
+    Pressing 'a' while in Browse mode jumps to next anchor, not text input.
+
+Fix — switch to Focus mode before typing:
+    Press Enter when landed on an input field.
+    Orca announces "focus mode" or plays a chime.
+    Type normally. Press Escape to return to Browse mode.
+
+Startup order (always Orca first):
+    orca &
+    sleep 2
+    firefox https://claude.ai &
+    arc-openlink handles this automatically.
+
+Find Orca modifier key:
+    grep -r "orcaModifierKeys" ~/.local/share/orca/
+    or: orca --setup
+    Desktop layout: Insert or KP_Insert.
+    Laptop layout: Caps Lock.
+
+Enable accessibility bridge (required):
+    gsettings get org.gnome.desktop.interface toolkit-accessibility
+    gsettings set org.gnome.desktop.interface toolkit-accessibility true
+
+Firefox: use ESR from APT, not the snap version.
+Check: which firefox   # /snap/ in path means snap version
+
+Switch from snap to APT ESR:
+    sudo snap remove firefox
+    sudo add-apt-repository ppa:mozillateam/ppa
+    sudo apt update
+    echo 'Package: firefox*
+Pin: release o=LP-PPA-mozillateam
+Pin-Priority: 1001' | sudo tee /etc/apt/preferences.d/mozilla-firefox
+    sudo apt install firefox-esr
+
+
+## 9. Git security incident
+
+Incident: Anthropic API key committed in
+log/transcript_2026-05-02_20-24-14.txt at line 402,
+commit 35bf63135544abd60941d1fb3858ff7dadcdb1a5.
+GitHub push protection blocked the push — remote is still clean.
+
+Status: UNRESOLVED. Key not yet revoked. History not yet cleaned.
+
+Resolution steps (in order):
+
+1. Fix Firefox/Orca (Section 8) — needed to reach console.anthropic.com.
+
+2. Log in to console.anthropic.com.
+   Create a new API key.
+   Update ANTHROPIC_API_KEY in ~/.bashrc. Source ~/.bashrc.
+
+3. Revoke old key via CLI using new key:
+       curl https://api.anthropic.com/v1/api_keys \
+         -H "x-api-key: $ANTHROPIC_API_KEY" \
+         -H "anthropic-version: 2023-06-01" \
+         -H "anthropic-beta: api-keys-2024-10-11" \
+         | python3 -m json.tool
+       # find the id of the old key, then:
+       curl -X DELETE \
+         https://api.anthropic.com/v1/api_keys/PASTE_OLD_KEY_ID \
+         -H "x-api-key: $ANTHROPIC_API_KEY" \
+         -H "anthropic-version: 2023-06-01" \
+         -H "anthropic-beta: api-keys-2024-10-11"
+
+4. Remove log/ from all git history:
+       pip install git-filter-repo --break-system-packages
+       cd ~/project_embeddings
+       git filter-repo --path log/ --invert-paths
+
+5. Verify clean:
+       git grep "sk-ant" $(git log --format="%H")
+       # must return nothing
+
+6. Confirm log/ is in .gitignore:
+       grep "log/" .gitignore
+       # if missing: echo "log/" >> .gitignore && git add .gitignore
+       #             git commit -m "chore: ensure log/ excluded"
+
+7. Re-add remote (filter-repo removes it):
+       git remote add origin \
+           git@github.com:arachnet-project/project_embeddings.git
+
+8. Force push:
+       git push --force origin main
+
+
+## 10. Oracle Agentic AI — project relevance
+
+Oracle 26ai introduces Select AI Agent and MCP server integration.
+Autonomous Database MCP Server is NOT available on Base DB System (your setup).
+
+What IS available:
+
+SQLcl MCP Server — works with Base DB System from Phase 1 onward.
+    Point Claude Desktop at SQLcl running in MCP mode for natural
+    language database queries during development and QA.
+    Config:
+        { "mcpServers": { "oracle-sqlcl": {
+            "command": "/path/to/sqlcl/bin/sql", "args": ["-mcp"] } } }
+
+Phase 3 Python hybrid workflow (no Oracle agentic features needed):
+    1. Oracle vector search over SNOMED concept embeddings.
+    2. Top-N results sent to Claude API.
+    3. Claude explains best match and clinical distinctions.
+    Fits naturally with db_connection.py from Step 0.6.
+
+If Select AI Agent is wanted in future: migration to Autonomous Database
+required. Significant decision — not an immediate concern.
+
+
+## 11. claude_chat.py
+
+Location: ~/project_embeddings/claude_chat.py
 Purpose: Terminal interface to Claude API. Designed for Orca screen reader.
-Session JSON files: ~/.claude_sessions/NAME.json
+Recommendation: switch to claude.ai web interface to eliminate per-token
+API cost. $25 spent in ~18 days — long sessions expensive due to full
+history sent per turn.
+
 Transcripts: ~/project_embeddings/log/transcript_*.txt
+CRITICAL: transcripts may contain API keys if key is printed in session.
+log/ must never be committed. See Section 9.
 
-Current version features:
-    Named sessions: --session NAME
-    Model selection: --model sonnet (default) or --model opus
-    Commands: /quit /clear /json /save [--last N] /history /sessions
-              /file <path> /extract <path>
-    /json  — saves session JSON only (checkpoint, use frequently)
-    /save  — saves transcript only
-    /quit  — saves both JSON and transcript, then exits
-    /extract writes relative to PROJECT_ROOT always
-    Rate limit: auto-retry 3 times with 60-second countdown
-    Warning if --file used with existing session history
+Features:
+    --session NAME, --model sonnet|opus
+    /json /save /quit /clear /history /sessions /file /extract
     MAX_TOKENS: 8192
+    Models: claude-sonnet-4-6 ($3/$15/M), claude-opus-4-6 ($5/$25/M)
 
-Key workflow rules:
-    Always run from project root: cd ~/project_embeddings
-    Use --session NAME for all development work.
-    Do NOT use --file when resuming existing session.
-    Use --file only for fresh sessions on new topics.
-    Type /json after every significant response — crash protection.
-    Start new sessions for new topics to keep token costs low.
-
-Alias in ~/.bashrc:
+Alias:
     alias claude="cd /home/jan/project_embeddings && \
         source venv/bin/activate && python claude_chat.py"
-    Usage: claude --session arachnet_step05
 
 
-## 9. What to do at the start of the next session
+## 12. UZIS correspondence
 
-The next session should begin by producing scripts/run_sql_setup.sh.
-Send this project_summary.md to Claude at the start of the session
-and say: "Please read the project summary and produce
-scripts/run_sql_setup.sh per the design in Section 5 Step 0.5 item 1."
+Contact: MUDr. Irena Molinari (UZIS), Mr. Zvolský (Standardisation).
+Online meeting arranged. Prep: docs/uzis_meeting_prep.md.
 
-Then work through the Step 0.5 remaining items in order as listed
-in Section 5.
+Confirmed:
+    RF2 package follows SNOMED International standards.
+    Language refset SCTID included in distribution.
+    Czech descriptions: sct_description with languageCode=cs.
+    Arachnet added to release notification list.
+
+Open questions:
+    ModuleId stability (likely confused with effectiveTime — confirm SCTID).
+    Complete refset inventory.
+    Release schedule vs SNOMED International.
+    Package access for development.
+    Namespace process for Arachnet extension authoring.
+
+Meeting date: not confirmed. Check email.
 
 
-## 10. Open questions and pending decisions
+## 13. Immediate next actions (in order)
 
-- Confirm oracledb thin mode connection parameters unchanged after
-  26ai patch is applied. Expected: no change, but verify.
+1.  Fix Firefox/Orca (Section 8):
+    toolkit-accessibility, ESR vs snap, startup order.
 
-- docs/todo.md is empty after crash. Reconstruct after Step 0.5 closes.
+2.  Resolve git security incident (Section 9):
+    revoke old key, clean history, force push.
+    Prerequisite: Firefox working to reach console.anthropic.com.
 
-- docs/todo_step_0_6.md needs to be written before Step 0.6 begins.
+3.  Add billing payment at console.anthropic.com if API access still needed.
 
-- LICENSE file (BUSL 1.1) not yet added to repository.
+4.  Fill passwords into ~/.bashrc on Ubuntu and OCI.
 
-- docs/runbooks/run_sql_setup.md — verify it reflects run_sql_setup.sh
-  as the primary invocation method.
+5.  Run sudo dnf update on OCI Linux VM (130.61.83.216), then reboot.
 
-- docs/conventions.md — update Python version reference to 3.12
-  after upgrade is confirmed.
+6.  Deploy test_infrastructure_sh.sh fix to OCI, re-run all 10 checks.
 
-- UZIS meeting date not yet confirmed. Check email and schedule.
+7.  Run SQL setup scripts on OCI:
+    bash scripts/run_sql_setup.sh
+    Run verification queries (Section 5, item D).
+
+8.  Upgrade Python to 3.12 on Ubuntu (Section 5, item E).
+    Rerun full test suite.
+
+9.  Apply 26ai patch via OCI console.
+    Precheck, backup, patch, verify connectivity.
+
+10. Commit and close Step 0.5.
+
+11. Write docs/todo_step_0_6.md, then begin Step 0.6 — db_connection.py.
+
+12. Set up arc CLI on both machines:
+    bash arc_setup.sh, fill ~/.arc_config, test magic link workflow.
+
+13. Reconstruct docs/todo.md (empty after crash).
+
+
+## 14. Open questions and pending decisions
+
+- Confirm oracledb thin mode unchanged after 26ai patch.
+- docs/todo.md empty — reconstruct after Step 0.5 closes.
+- docs/todo_step_0_6.md not yet written.
+- LICENSE file (BUSL 1.1) not yet added.
+- docs/runbooks/run_sql_setup.md — verify reflects run_sql_setup.sh v1.3.
+- docs/conventions.md — update Python version to 3.12 after upgrade.
+- UZIS meeting date not confirmed.
+- Consider migrating fully from claude_chat.py to claude.ai web interface.
+- run_ddl_script() should become general run_sql() in functions.sh — Step 0.6.
+- arc CLI not yet committed — commit after tested on both machines.
+- Check claude_chat.py does not print ANTHROPIC_API_KEY in session output.
