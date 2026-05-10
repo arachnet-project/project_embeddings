@@ -1,249 +1,96 @@
-# UZIS Correspondence — Czech SNOMED CT National Extension
-## Arachnet Clinical Embeddings
+# docs/uzis_correspondence.md
+# ============================================================
+# Arachnet Clinical Terminology Embeddings — UZIS Correspondence
+# Version: 1.1
+# Last updated: 2026-05-09
+# ============================================================
 
-**Document version:** 1.0
-**Date:** 2026-04-10
-**Contact:** MUDr. Magdaléna Svetíková — wait, correction:
-**Contact:** MUDr. Irena Molinari, UZIS
-**Subject:** Czech SNOMED CT national extension — technical questions
+## Overview
 
----
-
-## Background
-
-UZIS (Ústav zdravotnických informací a statistiky ČR) is the Czech national
-SNOMED CT affiliate administrator and the National Release Centre (NRC) for
-the Czech Republic. All questions regarding the Czech national SNOMED CT
-extension are directed to UZIS.
-
-Arachnet Project z.s. uses SNOMED CT under an affiliate licence administered
-by UZIS. The Czech national extension is planned for inclusion in the
-Arachnet Clinical Embeddings platform from Phase 1 onward.
+UZIS (Ústav zdravotnických informací a statistiky ČR) is the official
+national authority for SNOMED CT in the Czech Republic. This document
+records all correspondence and meeting notes relevant to the Arachnet
+project.
 
 ---
 
-## UZIS Response — Summary of Points
+## Contacts
 
-### Point 1 — RF2 file list
+- MUDr. Irena Molinari — head of Czech SNOMED CT translation
+- MUDr. Miroslav Zvolský — head of standardisation, Molinari's boss
+  miroslav.zvolsky@uzis.cz
 
-**UZIS statement:**
-The list of extended RF2 files is part of the Czech files package distributed
-by NRC CR. The package follows the standards of SNOMED CT International.
-
-**Analysis:**
-Clear and confirmed. The Czech extension package contains a complete RF2
-file list discoverable by examining the package. The package follows standard
-SNOMED International RF2 structure — standard folder layout, standard file
-naming, standard column layouts. No proprietary formats.
-
-**Impact on project:**
-No changes to ingestion pipeline design needed. Standard RF2 loader handles
-the Czech extension without modification.
-
-**Action required:** None. Obtain package via MLDS portal or directly from
-UZIS.
+See docs/contacts.md for full contact details.
 
 ---
 
-### Point 2 — Module identifier (moduleId)
+## Czech SNOMED CT Translation — current state (as of 2026-05-09)
 
-**UZIS statement:**
-UZIS will provide the moduleId for the Czech extension. It could differ for
-every release version.
+### What is confirmed
+- Translation scope: all international SNOMED CT concepts (claimed,
+  not precisely confirmed)
+- Translated elements: FSN (Fully Specified Names), PT (Preferred Terms),
+  additional synonyms
+- Multiple agencies worked on the translation — quality may vary
+- Language refset: exists, language code and publisher ID (ModuleId)
+  provided by Molinari
+- Other refsets: not created
+- UZIS is the official national authority — release will be unrestricted
 
-**Analysis:**
-The statement that moduleId differs per release is likely a misunderstanding.
-ModuleId identifies the authoring organisation — in this case UZIS or the
-Czech NRC — and should be a stable, fixed SCTID that does not change between
-releases. What changes between releases is the `effectiveTime` column on
-individual components, which records when each component was last modified.
+### What is unclear
+- Exact number of translated concepts
+- Whether all concepts are translated or only a clinical subset
+- RF2 packaging status — translation exists somewhere but has not
+  been assembled into RF2 format files
+- Release date — unknown even to Molinari, could be months or over a year
+- QA process — unclear if unified quality review was done across agencies
+- Whether SNOMED International has officially registered the Czech extension
 
-Ms Molinari may be conflating moduleId with effectiveTime, or the Czech
-extension may use multiple modules for different content types (e.g. one
-module for Czech descriptions, another for Czech-specific concepts). In
-the latter case there would be multiple moduleIds, but each would still
-be stable.
-
-**Impact on project:**
-ModuleId is used in `ingestion.yaml` under `national_extensions` to
-distinguish Czech extension components from international components at
-query time. If the moduleId is genuinely stable, it can be hardcoded once
-after the first load. If multiple modules are used, all need to be recorded.
-
-**Action required:**
-Clarify with UZIS at the online meeting. Proposed question:
-
-"We expect the moduleId to be a stable, fixed SCTID identifying the Czech
-NRC as the authoring organisation, remaining constant across all release
-versions, while effectiveTime changes with each release. Could you confirm
-whether this is correct? If the Czech extension uses multiple modules for
-different content types, please provide the complete list of module SCTIDs."
+### Key risk for Arachnet
+Czech language features cannot be built or tested until the RF2 package
+exists. This is an external dependency outside Arachnet's control.
+Development continues against the international English release.
 
 ---
 
-### Point 3 — Language refset SCTID
+## Meeting / Conversation History
 
-**UZIS statement:**
-The language refset identifier (SCTID) is defined as part of the Czech
-national extension. UZIS will send it with the distribution package.
+### ~2025 — Initial meeting (Jan, Molinari, Zvolský)
+- Jan offered help with RF2 packaging and technical work
+- UZIS declined — they have internal resources
+- Relationship remains cordial
 
-**Analysis:**
-Clear and confirmed. The Czech language refset SCTID is a fixed defined
-identifier included in the distribution package. This is consistent with
-standard SNOMED CT practice — the language refset SCTID identifies the
-Czech language acceptability refset and is stable across releases.
-
-**Impact on project:**
-The `language_refset_id` field in `ingestion.yaml` under `national_extensions`
-will be filled in after receiving the package. It can be discovered by:
-
-1. Checking the release notes document included in the package.
-2. Querying `sct_refset_language` after the first load and identifying the
-   refsetId that is not the English language refset SCTID `900000000000508004`.
-
-**Action required:**
-Record the Czech language refset SCTID in `ingestion.yaml` after the first
-load. Document it in this file for reference.
-
-Czech language refset SCTID: **to be filled after first load**
+### 2026 — Conversation with MUDr. Molinari
+- Molinari confirmed translation scope and elements (see above)
+- Release date: vague, no commitment
+- No follow-up meeting scheduled
+- Molinari was open but not precise about technical details
+- Impression: the RF2 packaging work has not started or is very early
 
 ---
 
-### Point 4 — Czech extension content
+## Correspondence
 
-**UZIS statement:**
-The Czech extension contains local (Czech) descriptions in the Description
-RF2 file. It may also contain refsets according to the release.
+### 2026-05-09 — Email to Molinari (draft)
+Subject: Czech SNOMED CT translation — request for development sample
+CC: MUDr. Zvolský
 
-**Analysis:**
-Confirmed. Czech descriptions load into `sct_description` alongside English
-descriptions, distinguished by `languageCode = cs`. The existing 17-table
-structure handles this with no changes needed.
+Request for a draft or partial sample of translation files for
+development purposes. Confidentiality commitment included:
+material will not be published or shared before official release.
+Also offered help with RF2 packaging if useful to UZIS.
 
-The phrase "according to release" regarding additional refsets means refset
-content may vary between releases. Some releases may include national subsets,
-additional mappings, or clinical domain groupings beyond the language refset.
-
-**Impact on project:**
-Current table structure is likely sufficient. However if the Czech extension
-includes a map refset in a non-standard format — for example a mapping to
-Czech DRG codes or the Czech national diagnosis classification — a new table
-entry in `database.yaml` may be needed.
-
-**Action required:**
-Ask at the online meeting for a complete list of refsets currently included
-in the Czech extension beyond the language acceptability refset. Proposed
-question:
-
-"Could you provide an overview of which reference sets are currently included
-in the Czech extension beyond the language acceptability refset? For example,
-are there national subset refsets, ICD-10 mappings specific to Czech
-healthcare, or clinical domain groupings? This will help us plan our database
-structure."
+Status: draft, not yet sent. Molinari's email address unknown —
+check email history or ask Zvolský.
 
 ---
 
-### Point 5 — Release notifications
+## Open Questions
 
-**UZIS statement:**
-UZIS will add Arachnet to the notification list for new Czech extension
-releases.
-
-**Analysis:**
-Clear and confirmed. This is the most important operational outcome of the
-correspondence — it ensures Arachnet receives timely notification of new
-releases and can update the platform accordingly.
-
-**Impact on project:**
-When a new Czech release notification arrives, the process is:
-1. Download the new package from MLDS portal.
-2. Update `data_release` in `project.yaml`.
-3. Run the full ingestion pipeline — drop, reload, validate, swap.
-4. Verify Czech descriptions and language refset are present in the new load.
-
-**Action required:**
-Confirm with UZIS that jan.mura@volny.cz is correctly registered on the
-notification list.
-
----
-
-### Point 6 — Online meeting offer
-
-**UZIS statement:**
-UZIS offers an online meeting to discuss remaining questions.
-
-**Analysis:**
-This is valuable and should be accepted promptly. A meeting allows resolution
-of technical questions that are difficult to clarify by email — particularly
-the moduleId question and the complete refset inventory.
-
-**Action required:**
-Accept the meeting offer. Prepare the agenda below.
-
----
-
-## Meeting Agenda
-
-Proposed questions for the UZIS online meeting:
-
-**1. Module identifier clarification**
-Confirm whether the Czech extension moduleId is a stable fixed SCTID across
-all releases. If multiple modules are used, obtain the complete list.
-
-**2. Complete refset inventory**
-Obtain a list of all refsets included in the current Czech extension beyond
-the language acceptability refset. Specifically ask about national subset
-refsets, Czech-specific maps, and clinical domain groupings.
-
-**3. Release schedule**
-Confirm the Czech extension release schedule and whether it aligns with or
-offsets from the SNOMED International monthly release cycle.
-
-**4. Current package access**
-Request the current Czech extension package for development and testing
-purposes.
-
-**5. Access process for future releases**
-Confirm the recommended process for accessing future releases — MLDS portal,
-direct download, or another channel.
-
-**6. Namespace for future extension authoring (optional)**
-If appropriate, mention that Arachnet Project z.s. is interested in
-understanding the process for obtaining a namespace identifier for potential
-future extension authoring — specifically for musculoskeletal disorders
-relevant to physiotherapy and concepts specific to visually impaired
-healthcare professionals.
-
----
-
-## Project Context for UZIS
-
-Arachnet Project z.s. is a Czech non-profit organisation building a clinical
-terminology embedding platform using SNOMED CT on Oracle Database 23ai. The
-platform is intended to support clinical decision support tools for Czech
-healthcare, with a particular focus on accessibility for visually impaired
-healthcare professionals. The Czech national extension is an important
-component for making the platform relevant to Czech clinical practice.
-
-SNOMED CT is used under affiliate licence administered by UZIS.
-
----
-
-## Key Identifiers (to be completed)
-
-| Item | Value |
-|------|-------|
-| Czech language refset SCTID | to be filled after first load |
-| Czech extension moduleId(s) | to be confirmed with UZIS |
-| Czech extension release schedule | to be confirmed with UZIS |
-| MLDS package identifier | to be confirmed |
-
----
-
-## Attribution
-
-This material includes SNOMED Clinical Terms (SNOMED CT) which is used
-by permission of SNOMED International. SNOMED and SNOMED CT are
-registered trademarks of SNOMED International.
-
-Czech national SNOMED CT affiliate licence administered by UZIS.
+1. Can UZIS provide a development sample before official release?
+2. What is the realistic release timeline?
+3. Is the Czech extension officially registered with SNOMED International?
+4. What is the complete refset inventory?
+5. What is the ModuleId (SCTID) for the Czech extension?
+6. Release schedule relative to SNOMED International releases?
+7. Namespace process for Arachnet extension authoring?

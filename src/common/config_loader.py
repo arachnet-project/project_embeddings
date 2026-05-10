@@ -26,6 +26,8 @@ from omegaconf import OmegaConf, DictConfig
 
 # Mandatory keys that must be present and non-null after full merge.
 # Path keys use shortcut form, e.g. "paths.base" resolves via cfg.paths.
+# Mandatory keys / updated
+
 MANDATORY_KEYS = [
     "active_environment",
     "project.name",
@@ -37,12 +39,14 @@ MANDATORY_KEYS = [
     "paths.rf2",
     "paths.parquet",
     "database.tns_alias",
-    "database.production_schema.user",
-    "database.production_schema.password_env_var",
-    "database.production_schema.tablespace",
-    "database.stage_schema.user",
-    "database.stage_schema.password_env_var",
-    "database.stage_schema.tablespace",
+    "database.snomed.user",
+    "database.snomed.password_env_var",
+    "database.snomed.tablespace",
+    "database.snomed_stage.user",
+    "database.snomed_stage.password_env_var",
+    "database.snomed_stage.tablespace",
+    "database.sys.user",
+    "database.sys.password_env_var",
     "database.tables",
     "ingestion.release.release_type",
     "ingestion.release.encoding",
@@ -63,7 +67,6 @@ MANDATORY_KEYS = [
     "ingestion.logging.manifest_filename",
     "governance.license",
 ]
-
 # Default config directory relative to this file.
 _DEFAULT_CONFIG_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "config"
