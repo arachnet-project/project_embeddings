@@ -1,6 +1,6 @@
-# src/common/db_connection.py
 # =============================================================================
 # Arachnet Clinical Terminology Embeddings — Oracle database connection
+# src/common/db_connection.py
 # =============================================================================
 # Purpose:
 #   All Oracle database communication goes through this module exclusively.
@@ -30,12 +30,16 @@
 # Version: 1.0
 # =============================================================================
 
+# --- Standard library ---
 import os
 import time
-import oracledb
 from contextlib import contextmanager
+
+# --- Third-party (pip install required) ---
+import oracledb
 from omegaconf import DictConfig
 
+# --- Project ---
 from src.common.exceptions import (
     SnomedConfigError,
     SnomedDBConnectionError,
@@ -72,7 +76,7 @@ _logger = get_logger(__name__)
 # =============================================================================
 
 # --- _get_credentials ---
-def _get_credentials(cfg: DictConfig, schema: str):
+def _get_credentials(cfg: DictConfig, schema: str) -> tuple:
     """Resolve Oracle credentials for the requested schema.
 
     Reads the environment variable names from cfg, then fetches the actual
@@ -128,7 +132,7 @@ def _get_credentials(cfg: DictConfig, schema: str):
             "cfg_path=database.{} error={} hint=check database.yaml".format(
                 schema, exc
             ),
-        )
+        ) from exc
 
     if not username:
         raise SnomedConfigError(
@@ -158,3 +162,92 @@ def _get_credentials(cfg: DictConfig, schema: str):
 
     return username, password, tns_alias
 # --- end _get_credentials ---
+
+
+# =============================================================================
+# Public functions
+# =============================================================================
+
+# --- get_connection ---
+def get_connection(cfg: DictConfig, schema: str) -> oracledb.Connection:
+    """Open and return a direct Oracle database connection.
+
+    Resolves credentials via _get_credentials, then connects using
+    oracledb in thin mode. Retries once after _RETRY_WAIT_SECONDS if
+    the first attempt fails.
+
+    When schema is "sys", connects AS SYSDBA. For all other schemas,
+    connects as a normal user. The caller does not need to know this
+    distinction.
+
+    autocommit is always False. The caller is responsible for
+    commit and rollback.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully loaded project configuration.
+    schema : str
+        One of "snomed", "snomed_stage", "sys".
+
+    Returns
+    -------
+    oracledb.Connection
+        Open database connection. The caller must close it when done,
+        or use open_connection() which closes it automatically.
+
+    Raises
+    ------
+    SnomedConfigError
+        If credentials cannot be resolved from cfg.
+    SnomedDBConnectionError
+        If the connection fails after one retry.
+    """
+    username, password, tns_alias = _get_credentials(cfg, schema)
+
+    # Build connection arguments as a dict so we can conditionally
+    # add mode=AUTH_MODE_SYSDBA for sys without duplicating the call.
+    connect_kwargs = {
+        "user":       username,
+        "password":   password,
+        "dsn":        tns_alias,
+        "autocommit": False,
+    }
+
+    if schema == "sys":
+        connect_kwargs["mode"] = oracledb.AUTH_MODE_SYSDBA
+
+    _logger.debug(
+        "Connecting to Oracle: schema=%r user=%r dsn=%r sysdba=%r",
+        schema, username, tns_alias, schema == "sys",
+    )
+
+    last_exc = None
+    for attempt in (1, 2):
+        try:
+            conn = oracledb.connect(**connect_kwargs)
+            _logger.info(
+                "Connected to Oracle: schema=%r user=%r dsn=%r attempt=%d",
+                schema, username, tns_alias, attempt,
+            )
+            return conn
+        except oracledb.DatabaseError as exc:
+            last_exc = exc
+            _logger.warning(
+                "Connection attempt %d failed: schema=%r error=%s",
+                attempt, schema, exc,
+            )
+            if attempt == 1:
+                _logger.debug(
+                    "Waiting %d seconds before retry.",
+                    _RETRY_WAIT_SECONDS,
+                )
+                time.sleep(_RETRY_WAIT_SECONDS)
+
+    raise SnomedDBConnectionError(
+        "Failed to connect to Oracle after 2 attempts.",
+        "schema={} user={} dsn={} error={}".format(
+            schema, username, tns_alias, last_exc
+        ),
+    )
+# --- end get_connection ---
