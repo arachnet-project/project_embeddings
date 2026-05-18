@@ -2,7 +2,7 @@
 # Python dependencies for Arachnet Clinical Embeddings.
 # All versions pinned for reproducibility across Ubuntu and OCI.
 # Update versions consciously — test on Ubuntu before pushing to OCI.
-# Last modified: 2026-04-11
+# Last modified: 2026-05-18
 
 # Configuration loading
 antlr4-python3-runtime==4.9.3
@@ -10,4 +10,4 @@ omegaconf==2.3.0
 PyYAML==6.0.3
 
 # Oracle database driver — to be added at Step 0.5
-# oracledb==2.1.2
+ oracledb==4.0.0
