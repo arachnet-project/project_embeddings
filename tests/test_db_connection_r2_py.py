@@ -19,7 +19,7 @@
 #   SNOMED_LOG_DIR set in environment.
 #
 # Author: Jan Mura
-# Version: 1.0
+# Version: 1.1
 # =============================================================================
 
 import os
@@ -184,17 +184,17 @@ def test_get_connection_calls_connect_with_correct_args():
 
 # --- test_get_connection_autocommit_false ---
 def test_get_connection_autocommit_false():
-    """get_connection sets autocommit=False on the returned connection."""
+    """get_connection passes autocommit=False to oracledb.connect."""
     cfg = _make_cfg()
     mock_conn = MagicMock()
     try:
         with patch.dict(os.environ, _SNOMED_ENV, clear=False):
-            with patch("oracledb.connect", return_value=mock_conn):
-                result = get_connection(cfg, "snomed")
-        # autocommit should have been set to False on the connection object
-        if mock_conn.autocommit != False:
+            with patch("oracledb.connect", return_value=mock_conn) as mock_connect:
+                get_connection(cfg, "snomed")
+        args, kwargs = mock_connect.call_args
+        if kwargs.get("autocommit") != False:
             _report("get_connection: autocommit=False",
-                    _FAIL, "autocommit={!r}".format(mock_conn.autocommit))
+                    _FAIL, "autocommit={!r}".format(kwargs.get("autocommit")))
             return
         _report("get_connection: autocommit=False", _PASS)
     except Exception as exc:
