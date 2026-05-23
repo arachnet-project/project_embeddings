@@ -1,7 +1,7 @@
 # Development Workflow — Arachnet Clinical Embeddings
 
-**Document version:** 1.1
-**Date:** 2026-04-10
+**Document version:** 1.2
+**Date:** 2026-05-21
 
 ---
 
@@ -13,6 +13,55 @@ All code flows through GitHub — never directly between machines.
 
 The workflow follows a simple cycle:
 write on Ubuntu → test on Ubuntu → push to GitHub → pull on OCI → verify on OCI.
+
+---
+
+## Shell aliases and functions
+
+The following aliases and functions are defined in `~/.bashrc` on Ubuntu
+and OCI. They are the standard way to interact with the project shell.
+The canonical `.bashrc` source is managed manually — update all machines
+when aliases change.
+
+### Project entry
+
+    ace     cd ~/project_embeddings && source venv/bin/activate
+
+### Clipboard helpers (Ubuntu — xclip based)
+
+    xi      Read from clipboard (xclip -selection clipboard -o)
+    xo      Write to clipboard (xclip -selection clipboard -i)
+    xed     Open clipboard content in vim, write result back to clipboard
+    xcat    Print clipboard content to terminal
+    xclear  Clear clipboard
+
+### File helpers
+
+    xcf     Copy file path to clipboard
+    xcaf    Copy file content to clipboard
+
+### Test and run helpers
+
+    xbash   Run clipboard content as bash, output to terminal and CB
+    xpy     Run clipboard content as python, output to terminal and CB
+    xrun    Run clipboard content as bash with venv active
+    xcom    Run wrk/commit.sh (git stage/commit/push)
+    xpull   Run wrk/pull.sh (git pull + status)
+
+### OCI transfer
+
+    xsup    rsync upload: Ubuntu → OCI transfer directory
+    xsd     rsync download: OCI transfer directory → Ubuntu
+
+### Workflow pattern
+
+The typical inner loop on Ubuntu:
+
+1. Claude produces code or a test in chat.
+2. `xed` — paste into vim, review, edit if needed, save.
+3. `xbash` or `xpy` — run it directly from clipboard.
+4. Read output. Fix in chat or in vim. Repeat.
+5. When passing, `xcom` — commit and push.
 
 ---
 
@@ -56,24 +105,13 @@ Anything that requires a live Oracle 23ai connection:
 
 ### Beginning of work session
 
-    # On Ubuntu — always start by pulling
-    cd ~/project_embeddings
-    git pull
-    source venv/bin/activate
+    ace                         # cd to project + activate venv
+    xpull                       # pull latest from GitHub
+    git log --oneline -3        # confirm current commit
 
-    # Confirm you are on the latest commit
-    git log --oneline -3
-
-    # Start Claude API session if needed
-    python claude_chat.py --session arachnet
-
-If continuing from a previous session, check `docs/todo.md` for the
-current task before writing any code.
-
-At the start of each Claude session, paste the current session summary
-from `docs/project_summary.md` to restore context. Use `/extract` at
-the end of the session to extract produced files directly into the
-project tree.
+Check `docs/todo.md` for current task before writing any code.
+At the start of each Claude session, open a new chat within the ACE
+project — memory carries over automatically.
 
 ### Writing and testing a unit (Ubuntu)
 
@@ -82,28 +120,27 @@ project tree.
 
        python tests/test_<component>_py.py 2>&1 | tee log/test_run.txt
 
+   Or using the clipboard loop: write test in Claude → `xpy` → read output.
+
 3. Read the output. Fix failures. Repeat until all checks pass.
 4. If the function is complete and all tests pass, move to the next
    function. Do not push partial work.
 
 ### End of Ubuntu work session
 
-    # Run the full test suite for everything changed today
+    # Run all tests changed today
     python tests/test_exceptions_py.py
     python tests/test_logger_py.py
     bash tests/test_logger_sh.sh
-    python tests/test_config_loader_py.py   # when exists
+    python tests/test_config_loader_py.py
 
-    # If all pass, commit
-    git add .
-    git commit -m "feat: descriptive message about what changed"
-    git push
+    # Update wrk/commit.sh — set msg= and files=() then:
+    xcom
 
     # Update todo.md before closing
     vim docs/todo.md
-    git add docs/todo.md
-    git commit -m "docs: update todo after session"
-    git push
+    # set msg and files in commit.sh, then:
+    xcom
 
 ### OCI verification (after Ubuntu push)
 
@@ -113,16 +150,15 @@ Run OCI verification when:
 - Before marking a step Complete in phase0_foundation.md
 
     # On OCI
-    cd /home/opc/project_embeddings
-    git pull
+    ace
+    xpull
 
-    # Run Ubuntu-style tests that are platform-independent
+    # Run platform-independent tests
     python tests/test_exceptions_py.py
     python tests/test_logger_py.py
-    bash tests/test_logger_sh.sh
 
-    # Run OCI-specific tests (connection, DDL, load) when they exist
-    python tests/test_db_connection_py.py   # Phase 0 Step 0.5
+    # Run OCI-specific tests when they exist
+    SNOMED_TEST_REAL_DB=true python tests/test_db_connection_py.py
 
 ---
 
@@ -211,20 +247,12 @@ needed.
 
 ## Quick reference — commands
 
-    # Ubuntu daily start
-    cd ~/project_embeddings && git pull && source venv/bin/activate
-
-    # Run a test
-    python tests/test_config_loader_py.py 2>&1 | tee log/test_run.txt
-
-    # Commit and push
-    git add . && git commit -m "message" && git push
-
-    # OCI update
-    cd /home/opc/project_embeddings && git pull
-
-    # Start Claude session
-    python claude_chat.py --session arachnet
+    ace                                     # enter project on any machine
+    xpull                                   # pull latest
+    xpy                                     # run clipboard as python
+    xbash                                   # run clipboard as bash
+    xcom                                    # commit and push via commit.sh
+    python tests/test_X_py.py 2>&1 | tee log/test_run.txt   # run a test
 
 ---
 

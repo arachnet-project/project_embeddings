@@ -3,8 +3,8 @@
 
 **Project:** Arachnet Clinical Embeddings
 **Owner:** Jan Mura, Arachnet Project z.s.
-**Document version:** 1.5
-**Date:** 2026-04-06
+**Document version:** 1.6
+**Date:** 2026-05-21
 **Status:** In progress
 
 ---
@@ -29,7 +29,7 @@ Steps must be executed in sequence. Each step depends on all prior steps.
 2. Step 0.2 — Error handling conventions
 3. Step 0.3 — Logging utility
 4. Step 0.4 — Configuration loader
-5. Step 0.5 — Database connection helper
+5. Step 0.5 — Database connection module
 6. Step 0.6 — Bash orchestrator
 
 ---
@@ -150,7 +150,7 @@ When Step 0.4 is complete, config loader exports `SNOMED_LOG_DIR` and
 
 ## Step 0.4 — Configuration Loader
 
-**Status:** In progress
+**Status:** Complete
 
 ### Outputs
 
@@ -174,26 +174,51 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 ---
 
-## Step 0.5 — Database Connection Helper
+## Step 0.5 — Database Connection Module
 
-**Status:** Pending
+**Status:** In progress
 
 **Depends on:** Steps 0.2, 0.3, 0.4
 
 ### Outputs
 
 - `src/common/db_connection.py`
-- `tests/test_db_connection_py.py`
-- `tests/protocols/test_db_connection_py.md`
+- `tests/test_db_connection_r1_py.py` — Round 1: _get_credentials (done)
+- `tests/test_db_connection_r2_py.py` — Round 2: get_connection (done)
+- `tests/test_db_connection_py.py` — orchestrator (pending)
+- `tests/protocols/test_db_connection_py.md` — protocol (pending)
 
 ### Interface
 
-- `get_connection(schema)` — direct connection for named schema
-- `get_pool(schema)` — connection pool, Phase 3 and 4 only
-- `execute_ddl(conn, sql)` — DDL with error handling
+- `_get_credentials(cfg, schema)` — private, resolves credentials from cfg
+- `get_connection(cfg, schema)` — direct connection, thin mode, retry once
+- `open_connection(cfg, schema)` — context manager, closes on exit
+- `execute_ddl(conn, sql)` — single DDL statement with error handling
 - `execute_batch(conn, sql, data, batch_size)` — bulk DML via executemany
+- `execute_query(conn, sql, params=None)` — SELECT, returns list[tuple]
+- `test_connection(cfg, schema)` — SELECT 1 FROM DUAL, returns True
+- `get_pool(cfg, schema)` — stub, raises NotImplementedError
 
-`autocommit=False` on all connections. Phase 1 uses `get_connection()` only.
+`autocommit=False` on all connections. Caller owns commit/rollback.
+
+### Progress
+
+- `_get_credentials` — complete, 10/10 tests Ubuntu + OCI
+- `get_connection` — complete, 10/10 tests Ubuntu + OCI (last commit 9650b88)
+- `open_connection` — next
+
+### Schema naming
+
+Schema names match Oracle usernames exactly:
+    snomed       — production schema
+    snomed_stage — stage schema
+    sys          — SYSDBA, setup only
+
+### Environment variables
+
+    SNOMED_DB_PASSWORD          — snomed schema password
+    SNOMED_STAGE_DB_PASSWORD    — snomed_stage schema password
+    SNOMED_SYS_DB_PASSWORD      — sys (SYSDBA) password
 
 ---
 
@@ -231,12 +256,13 @@ Environment variables:
 - `TNS_ADMIN` — OCI only
 - `SNOMED_DB_PASSWORD` — OCI only
 - `SNOMED_STAGE_DB_PASSWORD` — OCI only
-- `SNOMED_ADMIN_DB_PASSWORD` — OCI only, setup only
+- `SNOMED_SYS_DB_PASSWORD` — OCI only, setup only
 - `ANTHROPIC_API_KEY` — all machines
 
 ---
 
 ## Attribution
 
-This material includes SNOMED Clinical Terms (SN
-
+This material includes SNOMED Clinical Terms (SNOMED CT) which is used
+by permission of SNOMED International. SNOMED and SNOMED CT are
+registered trademarks of SNOMED International.

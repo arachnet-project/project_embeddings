@@ -1,69 +1,41 @@
-# docs/todo.md
 # ============================================================
 # Arachnet Clinical Terminology Embeddings — Master Todo
-# Version: 1.1
-# Updated: 2026-05-13
+# Version: 1.2
+# Updated: 2026-05-21
 # ============================================================
 
-## IMMEDIATE — next Ubuntu session
 
-- [ ] Run Round 1 tests on Ubuntu:
-      python tests/test_db_connection_r1_py.py
-
-- [ ] Commit pending files from Ubuntu:
-      src/common/db_connection.py
-      docs/conventions.md
-      docs/project_summary.md
-      docs/todo.md
-      tests/test_db_connection_r1_py.py
-      git commit -m "feat: db_connection.py v1.0 in progress, conventions v1.5"
-      git push
-      Then git pull on OCI and Mac.
-
-- [ ] Update ~/.bashrc on Ubuntu:
-      Rename SNOMED_ADMIN_DB_PASSWORD to SNOMED_SYS_DB_PASSWORD
-
-- [ ] Deploy clean .bashrc and .bash_profile to OCI:
-      Files produced 2026-05-10, in downloads.
-      Fill in real passwords before copying.
-      Backup first: cp ~/.bash_profile ~/.bash_profile.bak
-
-- [ ] Install Voxin voices on Ubuntu for better Orca experience.
-
-
-## PHASE 0 — STEP 0.6 (db_connection.py)
+## PHASE 0 — STEP 0.5 (db_connection.py) — IN PROGRESS
 
 - [x] database.yaml updated to v1.4 (Oracle usernames as keys)
 - [x] config_loader.py MANDATORY_KEYS updated
 - [x] conventions.md updated to v1.5 (import section labels)
-- [x] _get_credentials implemented
-- [x] get_connection implemented
-- [x] test_db_connection_r1_py.py written (10 tests)
-- [ ] Run Round 1 tests — NEXT
-- [ ] Write Round 2 tests (get_connection mocked error paths)
-- [ ] Implement open_connection (context manager)
-- [ ] Implement execute_ddl
-- [ ] Implement execute_batch
-- [ ] Implement execute_query (returns list[dict], keys lowercased)
-- [ ] Implement test_connection
-- [ ] Implement get_pool (stub, raises NotImplementedError)
-- [ ] Write orchestrator test_db_connection_py.py
+- [x] _get_credentials implemented and tested (Round 1, 10/10 Ubuntu + OCI)
+- [x] get_connection implemented and tested (Round 2, 10/10 Ubuntu + OCI)
+- [ ] open_connection — context manager wrapping get_connection — NEXT
+- [ ] execute_ddl
+- [ ] execute_batch
+- [ ] execute_query (returns list[tuple])
+- [ ] test_connection
+- [ ] get_pool (stub, raises NotImplementedError)
+- [ ] Write orchestrator tests/test_db_connection_py.py
 - [ ] Write tests/protocols/test_db_connection_py.md
 - [ ] Run real DB tests on OCI (SNOMED_TEST_REAL_DB=true)
+- [ ] Formal closing commit: "feat: Step 0.5 complete"
 
 
-## PHASE 0 — STEP 0.5 CLOSE
+## PHASE 0 — STEP 0.6 (Bash orchestrator)
+
+- [ ] Implement scripts/run.sh (pipeline orchestrator)
+- [ ] Blocked on Step 0.5 completion
+
+
+## PHASE 0 — STEP 0.4 CLOSE
 
 - [ ] Resolve 26ai patch — waiting for Oracle support (Slavomír Seno)
 - [ ] Python 3.12 upgrade on Ubuntu — deferred, low priority
 - [ ] Fix SET VERIFY OFF in run_sql_setup.sh heredoc (passwords shown)
-- [ ] Formal closing commit for Step 0.5
-
-
-## PHASE 0 — STEP 0.7
-
-- [ ] Implement scripts/run.sh (pipeline orchestrator)
-- [ ] Blocked on Step 0.6 completion
+- [ ] Formal closing commit for Step 0.4
 
 
 ## INFRASTRUCTURE
@@ -78,7 +50,16 @@
 - [ ] Resolve 26ai patch with Oracle support
 
 
-## ARC CLI
+## TOOLING (extract after Phase 0)
+
+- [ ] Extract .bashrc aliases and functions to own repository
+      after Phase 0 — same pattern as arc CLI extraction.
+      Current functions: xi, xo, xed, xcat, xclear, xcf, xcaf,
+      xcom, xpull, xbash, xpy, xrun, xsup, xsd
+      alias: ace
+
+
+## ARC CLI (extract after Phase 0)
 
 - [ ] Extract arc to own Git repository after Phase 0
       New Claude project already started with arc_project_summary.md
