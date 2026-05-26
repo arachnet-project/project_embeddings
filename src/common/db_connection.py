@@ -27,7 +27,7 @@
 #       conn.commit()
 #
 # Author:  Jan Mura
-# Version: 1.1
+# Version: 1.2
 # =============================================================================
 
 # --- Standard library ---
@@ -65,6 +65,9 @@ _RETRY_WAIT_SECONDS = 2
 # Maximum characters of a DDL statement to log at DEBUG level.
 # Long CREATE TABLE statements are truncated to keep logs readable.
 _DDL_LOG_MAX_LENGTH = 200
+
+# SQL used by test_connection to verify a schema is reachable and usable.
+_TEST_QUERY = "SELECT 1 FROM DUAL"
 
 # =============================================================================
 # Module-level logger
@@ -206,8 +209,6 @@ def get_connection(cfg: DictConfig, schema: str) -> oracledb.Connection:
     """
     username, password, tns_alias = _get_credentials(cfg, schema)
 
-    # Build connection arguments as a dict so we can conditionally
-    # add mode=AUTH_MODE_SYSDBA for sys without duplicating the call.
     connect_kwargs = {
         "user":       username,
         "password":   password,
@@ -299,3 +300,56 @@ def open_connection(
             "Connection closed: schema=%r", schema,
         )
 # --- end open_connection ---
+
+
+# --- test_connection ---
+def test_connection(cfg: DictConfig, schema: str) -> None:
+    """Verify that Oracle is reachable and the schema is usable.
+
+    Opens a connection via open_connection, executes SELECT 1 FROM DUAL,
+    and logs the result. Intended for use by the bootstrap script and
+    environment validation tools.
+
+    Returns normally on success. Raises on any failure — connection,
+    configuration, or query execution.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully loaded project configuration.
+    schema : str
+        One of "snomed", "snomed_stage", "sys".
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    SnomedConfigError
+        If credentials cannot be resolved from cfg.
+    SnomedDBConnectionError
+        If the connection fails or the test query fails.
+    """
+    try:
+        with open_connection(cfg, schema) as conn:
+            cursor = conn.cursor()
+            cursor.execute(_TEST_QUERY)
+            cursor.fetchone()
+            cursor.close()
+        _logger.info(
+            "Connection test passed: schema=%r", schema,
+        )
+    except SnomedConfigError:
+        raise
+    except SnomedDBConnectionError:
+        raise
+    except Exception as exc:
+        _logger.error(
+            "Connection test failed: schema=%r error=%s", schema, exc,
+        )
+        raise SnomedDBConnectionError(
+            "Connection test failed for schema {!r}.".format(schema),
+            "query={} error={}".format(_TEST_QUERY, exc),
+        ) from exc
+# --- end test_connection ---
