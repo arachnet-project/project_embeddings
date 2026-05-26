@@ -3,8 +3,8 @@
 
 **Project:** Arachnet Clinical Embeddings
 **Owner:** Jan Mura, Arachnet Project z.s.
-**Document version:** 1.6
-**Date:** 2026-05-21
+**Document version:** 1.7
+**Date:** 2026-05-22
 **Status:** In progress
 
 ---
@@ -30,7 +30,7 @@ Steps must be executed in sequence. Each step depends on all prior steps.
 3. Step 0.3 — Logging utility
 4. Step 0.4 — Configuration loader
 5. Step 0.5 — Database connection module
-6. Step 0.6 — Bash orchestrator
+6. Step 0.6 — Bootstrap script
 
 ---
 
@@ -185,6 +185,8 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 - `src/common/db_connection.py`
 - `tests/test_db_connection_r1_py.py` — Round 1: _get_credentials (done)
 - `tests/test_db_connection_r2_py.py` — Round 2: get_connection (done)
+- `tests/test_db_connection_r3_py.py` — Round 3: open_connection (done)
+- `tests/test_db_connection_r4_py.py` — Round 4: test_connection (pending)
 - `tests/test_db_connection_py.py` — orchestrator (pending)
 - `tests/protocols/test_db_connection_py.md` — protocol (pending)
 
@@ -193,10 +195,10 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 - `_get_credentials(cfg, schema)` — private, resolves credentials from cfg
 - `get_connection(cfg, schema)` — direct connection, thin mode, retry once
 - `open_connection(cfg, schema)` — context manager, closes on exit
+- `test_connection(cfg, schema)` — SELECT 1 FROM DUAL, returns True/False
 - `execute_ddl(conn, sql)` — single DDL statement with error handling
 - `execute_batch(conn, sql, data, batch_size)` — bulk DML via executemany
 - `execute_query(conn, sql, params=None)` — SELECT, returns list[tuple]
-- `test_connection(cfg, schema)` — SELECT 1 FROM DUAL, returns True
 - `get_pool(cfg, schema)` — stub, raises NotImplementedError
 
 `autocommit=False` on all connections. Caller owns commit/rollback.
@@ -205,7 +207,8 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 - `_get_credentials` — complete, 10/10 tests Ubuntu + OCI
 - `get_connection` — complete, 10/10 tests Ubuntu + OCI (last commit 9650b88)
-- `open_connection` — next
+- `open_connection` — complete, round 3 tests written, pending run
+- `test_connection` — next
 
 ### Schema naming
 
@@ -222,7 +225,7 @@ Schema names match Oracle usernames exactly:
 
 ---
 
-## Step 0.6 — Bash Orchestrator
+## Step 0.6 — Bootstrap Script
 
 **Status:** Pending
 
@@ -230,17 +233,39 @@ Schema names match Oracle usernames exactly:
 
 ### Outputs
 
-- `scripts/run.sh`
-- `tests/test_run_sh.sh`
-- `tests/protocols/test_run_sh.md`
+- `scripts/bootstrap.sh`
+- `tests/test_bootstrap_sh.sh`
+- `tests/protocols/test_bootstrap_sh.md`
 
 ### Purpose
 
-Top-level Bash entry point. Sources config, initialises logging,
-validates environment, invokes phase scripts with error propagation.
+A general prerequisite gate run before any significant work begins.
+Checks the shared fundamentals that every phase depends on.
+Phase-specific prerequisites remain in phase scripts.
 
-`run.sh --init` creates missing directories, verifies venv, checks all
-required environment variables. Does not invoke pipeline scripts.
+Used by: operators before ingestion, embedding, or any pipeline run.
+Used by: developers to verify environment after setup or change.
+
+### What it checks
+
+1. Required directories exist — creates missing ones
+2. Venv exists and is active
+3. All required environment variables are set
+4. Oracle is reachable — calls `test_connection` via Python
+5. Prints a short environment summary:
+   active environment, log dir, TNS alias, Python version
+
+### Exit behaviour
+
+Exit 0 — all checks pass. Safe to proceed.
+Exit 1 — any check fails. Clear message identifies what failed.
+
+### What it does not do
+
+Does not invoke pipeline scripts.
+Does not load data.
+Does not modify Oracle schemas.
+Phase-specific checks stay in phase scripts.
 
 ---
 

@@ -2,9 +2,8 @@
 # docs/road_map.md
 #
 # Author:  Jan Mura, Arachnet Project z.s.
-# Version: 1.1
+# Version: 1.2
 # Updated: 2026-05-22
-# Reviewed: Jan Mura, 2026-05-22
 
 ---
 
@@ -13,7 +12,7 @@
 **Status:** In progress.
 
 Shared utilities, configuration, logging, database connection,
-and Bash orchestrator. Establishes conventions and tooling that
+and bootstrap script. Establishes conventions and tooling that
 all subsequent phases depend on.
 
 Detail: `docs/phase0_foundation.md`
