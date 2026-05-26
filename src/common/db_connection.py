@@ -27,12 +27,13 @@
 #       conn.commit()
 #
 # Author:  Jan Mura
-# Version: 1.0
+# Version: 1.1
 # =============================================================================
 
 # --- Standard library ---
 import os
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 
 # --- Third-party (pip install required) ---
@@ -251,3 +252,50 @@ def get_connection(cfg: DictConfig, schema: str) -> oracledb.Connection:
         ),
     )
 # --- end get_connection ---
+
+
+# --- open_connection ---
+@contextmanager
+def open_connection(
+    cfg: DictConfig,
+    schema: str,
+) -> Generator[oracledb.Connection, None, None]:
+    """Open an Oracle connection and guarantee it is closed on exit.
+
+    A @contextmanager wrapper around get_connection(). Intended as the
+    standard way to obtain a connection throughout the project. Direct
+    use of get_connection() is permitted only when a context manager is
+    not appropriate.
+
+    The caller is responsible for commit and rollback within the block.
+    The connection is always closed on exit, whether the block succeeds
+    or raises an exception.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully loaded project configuration.
+    schema : str
+        One of "snomed", "snomed_stage", "sys".
+
+    Yields
+    ------
+    oracledb.Connection
+        Open database connection.
+
+    Raises
+    ------
+    SnomedConfigError
+        If credentials cannot be resolved from cfg.
+    SnomedDBConnectionError
+        If the connection fails after one retry.
+    """
+    conn = get_connection(cfg, schema)
+    try:
+        yield conn
+    finally:
+        conn.close()
+        _logger.debug(
+            "Connection closed: schema=%r", schema,
+        )
+# --- end open_connection ---
