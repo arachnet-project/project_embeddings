@@ -27,7 +27,7 @@
 #       conn.commit()
 #
 # Author:  Jan Mura
-# Version: 1.2
+# Version: 1.3
 # =============================================================================
 
 # --- Standard library ---
@@ -353,3 +353,60 @@ def test_connection(cfg: DictConfig, schema: str) -> None:
             "query={} error={}".format(_TEST_QUERY, exc),
         ) from exc
 # --- end test_connection ---
+
+
+# --- execute_ddl ---
+def execute_ddl(conn: oracledb.Connection, sql: str) -> None:
+    """Execute a single DDL statement against an open connection.
+
+    DDL statements (CREATE, ALTER, DROP, GRANT, etc.) are executed
+    directly. Oracle DDL auto-commits implicitly — no explicit commit
+    is needed or issued.
+
+    The statement is logged at DEBUG level, truncated to
+    _DDL_LOG_MAX_LENGTH characters to keep logs readable.
+
+    Parameters
+    ----------
+    conn : oracledb.Connection
+        An open database connection. Caller owns the connection lifecycle.
+    sql : str
+        A single DDL statement. Must be a non-empty string.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    SnomedDDLError
+        If sql is not a non-empty string, or if Oracle raises
+        DatabaseError during execution.
+    """
+    if not isinstance(sql, str) or not sql.strip():
+        raise SnomedDDLError(
+            "DDL statement must be a non-empty string.",
+            "hint=check caller",
+        )
+
+    truncated = sql[:_DDL_LOG_MAX_LENGTH]
+    if len(sql) > _DDL_LOG_MAX_LENGTH:
+        truncated = truncated + "..."
+
+    _logger.debug("Executing DDL: %s", truncated)
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql)
+        _logger.info("DDL executed: %s", truncated)
+    except oracledb.DatabaseError as exc:
+        _logger.error("DDL failed: %s error=%s", truncated, exc)
+        raise SnomedDDLError(
+            "DDL execution failed.",
+            "stmt={} error={}".format(truncated, exc),
+        ) from exc
+    finally:
+        if cursor is not None:
+            cursor.close()
+# --- end execute_ddl ---
