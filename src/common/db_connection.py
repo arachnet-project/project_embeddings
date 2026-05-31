@@ -1,3 +1,4 @@
+# ARC_FILE: src/common/db_connection.py
 # =============================================================================
 # Arachnet Clinical Terminology Embeddings — Oracle database connection
 # src/common/db_connection.py
@@ -27,7 +28,7 @@
 #       conn.commit()
 #
 # Author:  Jan Mura
-# Version: 1.3
+# Version: 1.4
 # =============================================================================
 
 # --- Standard library ---
@@ -410,3 +411,97 @@ def execute_ddl(conn: oracledb.Connection, sql: str) -> None:
         if cursor is not None:
             cursor.close()
 # --- end execute_ddl ---
+
+
+# --- execute_batch ---
+def execute_batch(
+    conn: oracledb.Connection,
+    sql: str,
+    data: list,
+    batch_size: int,
+) -> int:
+    """Execute a DML statement in batches using executemany.
+
+    Intended for bulk inserts during RF2 ingestion. Splits data into
+    batches of batch_size rows and calls executemany for each batch.
+    The caller is responsible for commit and rollback.
+
+    Parameters
+    ----------
+    conn : oracledb.Connection
+        An open database connection. Caller owns the connection lifecycle.
+    sql : str
+        A single DML statement with bind variable placeholders.
+        Must be a non-empty string.
+    data : list
+        A list of rows to insert. Each row must be a tuple or list
+        matching the bind variables in sql. Must not be empty.
+    batch_size : int
+        Number of rows per executemany call. Must be a positive integer.
+
+    Returns
+    -------
+    int
+        Total number of rows submitted across all batches.
+
+    Raises
+    ------
+    SnomedLoadError
+        If sql is not a non-empty string, data is empty or not a list,
+        batch_size is not a positive integer, or Oracle raises
+        DatabaseError during execution.
+    """
+    if not isinstance(sql, str) or not sql.strip():
+        raise SnomedLoadError(
+            "Batch SQL statement must be a non-empty string.",
+            "hint=check caller",
+        )
+
+    if not isinstance(data, list) or len(data) == 0:
+        raise SnomedLoadError(
+            "Batch data must be a non-empty list.",
+            "hint=check caller",
+        )
+
+    if not isinstance(batch_size, int) or batch_size < 1:
+        raise SnomedLoadError(
+            "batch_size must be a positive integer.",
+            "batch_size={} hint=check caller".format(batch_size),
+        )
+
+    total_rows = len(data)
+    rows_submitted = 0
+    cursor = None
+
+    _logger.debug(
+        "Starting batch load: total_rows=%d batch_size=%d",
+        total_rows, batch_size,
+    )
+
+    try:
+        cursor = conn.cursor()
+        for start in range(0, total_rows, batch_size):
+            batch = data[start:start + batch_size]
+            cursor.executemany(sql, batch)
+            rows_submitted += len(batch)
+            _logger.debug(
+                "Batch submitted: rows=%d total_so_far=%d",
+                len(batch), rows_submitted,
+            )
+        _logger.info(
+            "Batch load complete: total_rows_submitted=%d", rows_submitted,
+        )
+        return rows_submitted
+    except oracledb.DatabaseError as exc:
+        _logger.error(
+            "Batch load failed: rows_submitted=%d error=%s",
+            rows_submitted, exc,
+        )
+        raise SnomedLoadError(
+            "Batch execution failed after {} rows.".format(rows_submitted),
+            "error={}".format(exc),
+        ) from exc
+    finally:
+        if cursor is not None:
+            cursor.close()
+# --- end execute_batch ---
