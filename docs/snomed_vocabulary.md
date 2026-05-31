@@ -1,3 +1,4 @@
+# ARC_FILE: docs/snomed_vocabulary.md
 # SNOMED CT — Reference Vocabulary
 # docs/snomed_vocabulary.md
 #

@@ -1,3 +1,4 @@
+# ARC_FILE: docs/phase0_foundation.md
 # Phase 0 — Foundation & Shared Infrastructure
 ## Arachnet Clinical Embeddings — Technical Documentation
 

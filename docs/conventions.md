@@ -1,8 +1,8 @@
-# Arachnet Clinical Embeddings — Coding Conventions
-# docs/conventions.md
+# ARC_FILE: docs/conventions.md
 # =========================================
-# Version: 1.4
-# Last updated: 2026-04-20
+# Arachnet Clinical Embeddings — Coding Conventions
+# Version: 1.6
+# Last updated: 2026-05-22
 # Applies from: Step 0.4 onward. No retrofitting of earlier files.
 # Type annotations apply from _validate_mandatory_keys onward.
 # No retrofitting of earlier functions.
@@ -79,9 +79,9 @@ Module-level constants in uppercase with underscores, for example:
 
 Every Python file must start with a header block like this:
 
+    # src/common/example.py
     # =============================================================================
     # Arachnet Clinical Embeddings — <description>
-    # <path/to/file.py>
     # =============================================================================
     # Purpose:
     #   <one or two sentences>
@@ -92,6 +92,44 @@ Every Python file must start with a header block like this:
     # Author: Jan Mura
     # Version: <version>
     # =============================================================================
+
+Note: the first line is always the relative path comment (see below).
+
+## First-line path convention
+
+Every file in the project must have its relative path from the project
+root as the very first line, using the ARC_FILE: marker formatted as
+a comment appropriate to the file type:
+
+    Python:   # ARC_FILE: src/common/db_connection.py
+    Bash:     # ARC_FILE: scripts/bootstrap.sh
+    YAML:     # ARC_FILE: config/database.yaml
+    SQL:      -- ARC_FILE: sql/ddl/create_schema.sql
+    Markdown: # ARC_FILE: docs/road_map.md
+
+This convention is required by the xdep deployment function in the
+arc workflow toolset. xdep reads line 1, strips the comment marker
+and ARC_FILE: prefix, and uses the remainder as the relative path
+under PROJECT_ROOT.
+
+The ARC_FILE: marker is explicit and grep-able:
+    grep -r "ARC_FILE:" . lists all managed files and their paths.
+
+If a file has an old-style plain path comment (without ARC_FILE:),
+update it to the new format.
+
+### Markdown special case
+
+Markdown has no comment syntax. The # prefix on line 1 renders as a
+top-level heading in any Markdown viewer or renderer. This is a known
+and accepted limitation.
+
+Rule: never transform or publish a Markdown file directly.
+Always strip line 1 first using the xmd workflow function, which
+handles stripping automatically before passing to pandoc.
+
+Manual stripping if needed:
+    tail -n +2 docs/road_map.md | pandoc -f markdown -t html
 
 ## YAML
 
@@ -105,9 +143,9 @@ Null values written as null, not ~.
 ### File header
 Every SQL file must start with a header block like this:
 
+    -- sql/ddl/example.sql
     -- =============================================================================
     -- Arachnet Clinical Embeddings — <description>
-    -- <path/to/file.sql>
     -- =============================================================================
     -- Purpose:
     --   <one or two sentences>
@@ -119,6 +157,8 @@ Every SQL file must start with a header block like this:
     -- Version: <version>
     -- Last modified: <YYYY-MM-DD>
     -- =============================================================================
+
+Note: the first line is always the relative path comment (see above).
 
 ### Indentation
 Use 4 spaces. No tabs.
@@ -173,3 +213,26 @@ Run with: python tests/test_<name>_rN_py.py
 No pytest. No conftest.py.
 Per-round files named: test_<name>_rN_py.py where N is the round number.
 Orchestrator file named: test_<name>_py.py, written after all rounds pass.
+
+## Workflow toolset
+
+The project workflow (xdep, xpy, xbash, xmd, clipboard functions, and
+all shell aliases) lives in a standalone Git repository separate from
+ACE. It is not part of this project.
+
+Rationale: the workflow is personal productivity infrastructure reusable
+across all projects. Coupling it to ACE would be wrong.
+
+ACE sources the workflow from its own location:
+    source ~/workflow/aliases.sh
+
+The xmd Markdown transformer (strips ARC_FILE: line 1, calls pandoc)
+lives in the arc repo. Pandoc is a standalone system binary — not a
+Python module. Install with: apt install pandoc (Ubuntu) or brew install
+pandoc (macOS).
+
+PROJECT_ROOT must be exported before sourcing aliases.sh. aliases.sh
+contains a guard that warns if PROJECT_ROOT is not set.
+
+Todo items related to the workflow repo are tracked in the master
+todo.md under the TOOLING section.
