@@ -28,7 +28,7 @@
 #       conn.commit()
 #
 # Author:  Jan Mura
-# Version: 1.4
+# Version: 1.6
 # =============================================================================
 
 # --- Standard library ---
@@ -69,6 +69,14 @@ _DDL_LOG_MAX_LENGTH = 200
 
 # SQL used by test_connection to verify a schema is reachable and usable.
 _TEST_QUERY = "SELECT 1 FROM DUAL"
+
+# Keywords that identify valid DDL statements for execute_ddl.
+# Used to guard against accidental DML or SELECT being passed to execute_ddl.
+_DDL_KEYWORDS = ("CREATE", "ALTER", "DROP", "GRANT", "REVOKE", "TRUNCATE")
+
+# Keyword that identifies valid SELECT statements for execute_query.
+# Note: WITH (CTE) queries are not supported — rewrite as inline subqueries.
+_SELECT_KEYWORD = "SELECT"
 
 # =============================================================================
 # Module-level logger
@@ -390,6 +398,16 @@ def execute_ddl(conn: oracledb.Connection, sql: str) -> None:
             "hint=check caller",
         )
 
+    first_word = sql.strip().split()[0].upper()
+    if first_word not in _DDL_KEYWORDS:
+        raise SnomedDDLError(
+            "execute_ddl only accepts DDL statements.",
+            "first_word={!r} valid_keywords={} hint=use execute_query or "
+            "execute_batch for other statements".format(
+                first_word, ", ".join(_DDL_KEYWORDS)
+            ),
+        )
+
     truncated = sql[:_DDL_LOG_MAX_LENGTH]
     if len(sql) > _DDL_LOG_MAX_LENGTH:
         truncated = truncated + "..."
@@ -505,3 +523,116 @@ def execute_batch(
         if cursor is not None:
             cursor.close()
 # --- end execute_batch ---
+
+
+# --- execute_query ---
+def execute_query(
+    conn: oracledb.Connection,
+    sql: str,
+    params: list | None = None,
+) -> list:
+    """Execute a SELECT query and return all rows.
+
+    Intended for validation queries, row counts, and MRCM lookups.
+    Not intended for large result sets — fetchall() loads all rows
+    into memory.
+
+    The caller is responsible for the connection lifecycle.
+    No commit or rollback is issued.
+
+    Parameters
+    ----------
+    conn : oracledb.Connection
+        An open database connection. Caller owns the connection lifecycle.
+    sql : str
+        A SELECT statement. Must be a non-empty string.
+    params : list or None
+        Optional bind variable values. Must be a list if provided.
+        Pass None or omit for queries with no bind variables.
+        An empty list is treated the same as None — no params passed
+        to Oracle.
+
+    Returns
+    -------
+    list
+        List of tuples, one per row. Empty list if no rows returned.
+
+    Raises
+    ------
+    SnomedDBConnectionError
+        If sql is not a non-empty string, params is not a list or None,
+        or if Oracle raises DatabaseError during execution.
+    """
+    if not isinstance(sql, str) or not sql.strip():
+        raise SnomedDBConnectionError(
+            "Query SQL statement must be a non-empty string.",
+            "hint=check caller",
+        )
+
+    if params is not None and not isinstance(params, list):
+        raise SnomedDBConnectionError(
+            "Query params must be a list or None.",
+            "params_type={} hint=check caller".format(type(params).__name__),
+        )
+
+    first_word = sql.strip().split()[0].upper()
+    if first_word != _SELECT_KEYWORD:
+        raise SnomedDBConnectionError(
+            "execute_query only accepts SELECT statements.",
+            "first_word={!r} hint=use execute_ddl or execute_batch for "
+            "other statements. Note: WITH (CTE) queries are not "
+            "supported.".format(first_word),
+        )
+
+    _logger.debug("Executing query: %s", sql[:_DDL_LOG_MAX_LENGTH])
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        if params:
+            cursor.execute(sql, params)
+        else:
+            cursor.execute(sql)
+        rows = cursor.fetchall()
+        _logger.debug("Query returned %d row(s).", len(rows))
+        return rows
+    except oracledb.DatabaseError as exc:
+        _logger.error("Query failed: error=%s", exc)
+        raise SnomedDBConnectionError(
+            "Query execution failed.",
+            "error={}".format(exc),
+        ) from exc
+    finally:
+        if cursor is not None:
+            cursor.close()
+# --- end execute_query ---
+
+
+# --- get_pool ---
+def get_pool(cfg: DictConfig, schema: str) -> None:
+    """Connection pool stub. Not implemented in Phase 0.
+
+    Connection pooling is deferred to Phase 3/4 when concurrent
+    query load justifies it.
+
+    Parameters
+    ----------
+    cfg : DictConfig
+        Fully loaded project configuration.
+    schema : str
+        One of "snomed", "snomed_stage", "sys".
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    NotImplementedError
+        Always. Pooling is not available in Phase 0.
+    """
+    raise NotImplementedError(
+        "get_pool is not implemented. "
+        "Connection pooling is deferred to Phase 3/4."
+    )
+# --- end get_pool ---

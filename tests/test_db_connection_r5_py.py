@@ -1,3 +1,4 @@
+# ARC_FILE: tests/test_db_connection_r5_py.py
 # =============================================================================
 # Arachnet Clinical Terminology Embeddings — DB Connection Test Round 5
 # tests/test_db_connection_r5_py.py
@@ -19,7 +20,7 @@
 #   SNOMED_LOG_DIR set in environment.
 #
 # Author: Jan Mura
-# Version: 1.0
+# Version: 1.1
 # =============================================================================
 
 import sys
@@ -322,6 +323,27 @@ def test_execute_ddl_non_string_raises():
 # --- end test_execute_ddl_non_string_raises ---
 
 
+# --- test_execute_ddl_non_ddl_statement_raises ---
+def test_execute_ddl_non_ddl_statement_raises():
+    """execute_ddl raises SnomedDDLError when sql is a SELECT statement."""
+    conn, _ = _make_mock_conn()
+    raised = False
+    try:
+        try:
+            execute_ddl(conn, "SELECT 1 FROM DUAL")
+        except SnomedDDLError:
+            raised = True
+        if not raised:
+            _report("execute_ddl: non-DDL statement raises SnomedDDLError",
+                    _FAIL, "SnomedDDLError was not raised")
+            return
+        _report("execute_ddl: non-DDL statement raises SnomedDDLError", _PASS)
+    except Exception as exc:
+        _report("execute_ddl: non-DDL statement raises SnomedDDLError",
+                _FAIL, "raised: {}".format(exc))
+# --- end test_execute_ddl_non_ddl_statement_raises ---
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -346,6 +368,7 @@ def main() -> None:
     test_execute_ddl_empty_string_raises()
     test_execute_ddl_whitespace_only_raises()
     test_execute_ddl_non_string_raises()
+    test_execute_ddl_non_ddl_statement_raises()
 
     sys.exit(_summarise())
 # --- end main ---
