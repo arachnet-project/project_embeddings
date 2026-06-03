@@ -1,9 +1,9 @@
 # ARC_FILE: docs/todo_step_0_5.md
 # ============================================================
 # Arachnet Clinical Terminology Embeddings — Step 0.5 Todo
-# Version: 1.2
+# Version: 1.3
 # Created: 2026-05-10
-# Updated: 2026-05-22
+# Updated: 2026-06-01
 # ============================================================
 #
 # Revision policy: review and update at the start of every
@@ -109,12 +109,13 @@ executemany — execute_batch is the controlled primitive for that push.
       Does NOT commit. Raises SnomedLoadError on failure.
       Cursor closed in finally.
 
-- [ ] execute_query(conn, sql, params=None) -> list[tuple]
-      SELECT query. Returns list of tuples.
-      Used for validation — row counts, data checks.
-      Raises SnomedDBConnectionError on failure.
+- [x] execute_query(conn, sql, params=None) -> list[tuple]
+      Done 2026-06-01. Round 7 tests: 12/12 Ubuntu + OCI.
+      SELECT only — guards against non-SELECT statements.
+      Returns list of tuples. Raises SnomedDBConnectionError on failure.
 
-- [ ] get_pool(cfg, schema) -> raises NotImplementedError
+- [x] get_pool(cfg, schema) -> raises NotImplementedError
+      Done 2026-06-01. Tested inline in orchestrator.
       Stub. Pooling deferred to Phase 3/4.
 
 
@@ -122,9 +123,9 @@ executemany — execute_batch is the controlled primitive for that push.
 
 - [x] src/common/db_connection.py v1.4 — through execute_batch
 - [ ] src/common/db_connection.py — execute_query + get_pool remaining
-- [ ] tests/test_db_connection_r6_py.py — Round 6 written, not yet run
-- [ ] tests/test_db_connection_r7_py.py — Round 7: execute_query
-- [ ] tests/test_db_connection_py.py — orchestrator (after all rounds pass)
+- [x] tests/test_db_connection_r6_py.py — Round 6: 10/10 Ubuntu + OCI
+- [x] tests/test_db_connection_r7_py.py — Round 7: 12/12 Ubuntu + OCI
+- [x] tests/test_db_connection_py.py — orchestrator: 8/8 rounds Ubuntu + OCI
 - [ ] tests/protocols/test_db_connection_py.md — test protocol
 - [x] config/database.yaml — updated to v1.4 (schema key rename)
 - [x] src/common/config_loader.py — MANDATORY_KEYS updated
@@ -156,10 +157,15 @@ tests/test_db_connection_r5_py.py
 
 ### Round 6 — execute_batch (mocked)
 tests/test_db_connection_r6_py.py
-Written 2026-05-22. Not yet run.
+10/10 Ubuntu + OCI.
 
 ### Round 7 — execute_query (mocked)
-Pending — to be written after Round 6 passes.
+tests/test_db_connection_r7_py.py
+12/12 Ubuntu + OCI.
+
+### Orchestrator
+tests/test_db_connection_py.py
+8/8 rounds Ubuntu + OCI. Step 0.5 complete.
 
 
 ## Testing strategy (remaining)

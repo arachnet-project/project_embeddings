@@ -4,8 +4,8 @@
 
 **Project:** Arachnet Clinical Embeddings
 **Owner:** Jan Mura, Arachnet Project z.s.
-**Document version:** 1.7
-**Date:** 2026-05-22
+**Document version:** 1.8
+**Date:** 2026-06-01
 **Status:** In progress
 
 ---
@@ -177,7 +177,7 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 ## Step 0.5 — Database Connection Module
 
-**Status:** In progress
+**Status:** Complete
 
 **Depends on:** Steps 0.2, 0.3, 0.4
 
@@ -187,8 +187,11 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 - `tests/test_db_connection_r1_py.py` — Round 1: _get_credentials (done)
 - `tests/test_db_connection_r2_py.py` — Round 2: get_connection (done)
 - `tests/test_db_connection_r3_py.py` — Round 3: open_connection (done)
-- `tests/test_db_connection_r4_py.py` — Round 4: test_connection (pending)
-- `tests/test_db_connection_py.py` — orchestrator (pending)
+- `tests/test_db_connection_r4_py.py` — Round 4: test_connection (done)
+- `tests/test_db_connection_r5_py.py` — Round 5: execute_ddl (done)
+- `tests/test_db_connection_r6_py.py` — Round 6: execute_batch (done)
+- `tests/test_db_connection_r7_py.py` — Round 7: execute_query (done)
+- `tests/test_db_connection_py.py` — orchestrator (done)
 - `tests/protocols/test_db_connection_py.md` — protocol (pending)
 
 ### Interface
@@ -206,10 +209,8 @@ Env var naming: `SNOMED_<SECTION>_<KEY>` uppercase.
 
 ### Progress
 
-- `_get_credentials` — complete, 10/10 tests Ubuntu + OCI
-- `get_connection` — complete, 10/10 tests Ubuntu + OCI (last commit 9650b88)
-- `open_connection` — complete, round 3 tests written, pending run
-- `test_connection` — next
+- All functions complete — orchestrator 8/8 rounds Ubuntu + OCI
+- Closing commit pending
 
 ### Schema naming
 

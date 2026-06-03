@@ -1,8 +1,8 @@
 # ARC_FILE: docs/todo.md
 # ============================================================
 # Arachnet Clinical Terminology Embeddings — Master Todo
-# Version: 1.3
-# Updated: 2026-05-22
+# Version: 1.4
+# Updated: 2026-06-01
 # ============================================================
 #
 # Revision policy: review and update at the start of every
@@ -20,10 +20,10 @@
 - [x] test_connection implemented and tested (Round 4, 9/9 Ubuntu)
 - [x] execute_ddl implemented and tested (Round 5, 10/10 Ubuntu)
 - [x] execute_batch implemented (Round 6 written, not yet run)
-- [ ] Run Round 6 tests (execute_batch) on Ubuntu
-- [ ] execute_query (returns list[tuple])
-- [ ] get_pool (stub, raises NotImplementedError)
-- [ ] Write orchestrator tests/test_db_connection_py.py
+- [x] Run Round 6 tests (execute_batch) on Ubuntu + OCI
+- [x] execute_query implemented and tested (Round 7, 12/12 Ubuntu + OCI)
+- [x] get_pool stub implemented and tested (orchestrator inline)
+- [x] Write orchestrator tests/test_db_connection_py.py — passed Ubuntu + OCI
 - [ ] Write tests/protocols/test_db_connection_py.md
 - [ ] Run real DB tests on OCI (SNOMED_TEST_REAL_DB=true)
 - [ ] Formal closing commit: "feat: Step 0.5 complete"
