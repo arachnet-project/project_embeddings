@@ -1,9 +1,10 @@
+# ARC_FILE: docs/directory_structure.md
 # Directory Structure — Arachnet Clinical Embeddings
-
-**Document version:** 1.3
-**Date:** 2026-04-20
-
----
+# docs/directory_structure.md
+#
+# Version: 1.4
+# Updated: 2026-06-05
+# ============================================================
 
 ## Overview
 
@@ -26,63 +27,83 @@ project_embeddings/
 ├── config/                          # YAML configuration files
 │   ├── project.yaml                 # Global, phase-independent config
 │   ├── database.yaml                # DB connection, schemas, table registry
-│   └── ingestion.yaml               # Phase 1 RF2 ingestion pipeline config
+│   ├── ingestion.yaml               # Phase 1 RF2 ingestion pipeline config
+│   └── templates/                   # File header templates
+│       └── python_header.py         # Python file header template
 │
 ├── src/                             # Python source code
 │   └── common/                      # Shared utilities — all phases
 │       ├── exceptions.py            # Project exception hierarchy
 │       ├── logger.py                # Python logging utility
 │       ├── config_loader.py         # YAML config loader (Step 0.4)
-│       └── db_connection.py         # Oracle connection helper (Step 0.6)
+│       └── db_connection.py         # Oracle connection module (Step 0.5)
 │
 ├── scripts/                         # Bash scripts
 │   ├── common/                      # Shared Bash utilities
-│   │   ├── logger.sh                # Bash logging library (sourced)
-│   │   └── run.sh                   # Main orchestrator / init (Step 0.7)
+│   │   └── logger.sh                # Bash logging library (sourced)
+│   ├── bootstrap.sh                 # Prerequisite gate (Step 0.6)
 │   └── sql_setup.sh                 # One-time DB schema setup runner
-│                                    # Runs sql/ddl/setup/ scripts as SYSDBA
 │
 ├── tests/                           # All test material
-│   ├── test_logger_sh.sh            # Test for scripts/common/logger.sh
-│   ├── test_logger_py.py            # Test for src/common/logger.py
-│   ├── test_exceptions_py.py        # Test for src/common/exceptions.py
-│   ├── test_config_loader_py.py     # Test for src/common/config_loader.py (Step 0.4)
-│   ├── test_db_connection_py.py     # Test for src/common/db_connection.py (Step 0.6)
+│   ├── test_logger_sh.sh
+│   ├── test_logger_py.py
+│   ├── test_exceptions_py.py
+│   ├── test_config_loader_py.py
+│   ├── test_db_connection_r1_py.py  # Round 1: _get_credentials
+│   ├── test_db_connection_r2_py.py  # Round 2: get_connection
+│   ├── test_db_connection_r3_py.py  # Round 3: open_connection
+│   ├── test_db_connection_r4_py.py  # Round 4: test_connection
+│   ├── test_db_connection_r5_py.py  # Round 5: execute_ddl
+│   ├── test_db_connection_r6_py.py  # Round 6: execute_batch
+│   ├── test_db_connection_r7_py.py  # Round 7: execute_query
+│   ├── test_db_connection_py.py     # Orchestrator — full Step 0.5 record
+│   ├── test_bootstrap_sh.sh         # Step 0.6 (pending)
 │   ├── protocols/                   # Test protocols — one per test script
 │   │   ├── test_logger_sh.md
 │   │   ├── test_logger_py.md
 │   │   ├── test_exceptions_py.md
-│   │   ├── test_config_loader_py.md # Step 0.4
-│   │   └── test_db_connection_py.md # Step 0.6
+│   │   ├── test_config_loader_py.md
+│   │   └── test_db_connection_py.md
 │   └── results/                     # Test results — NOT committed to Git
 │       └── .gitkeep
 │
-├── docs/                            # Architecture and reference documentation
+├── docs/                            # Project documentation
+│   ├── claude_chat_howto.md         # Guide for using Claude in this project
+│   ├── contacts.md                  # Project contacts
 │   ├── conventions.md               # Coding and documentation conventions
+│   ├── dev_workflow.md              # Developer workflow guide
 │   ├── directory_structure.md       # This document
 │   ├── error_codes.md               # Exit code reference
 │   ├── git_workflow.md              # Git workflow for all machines
+│   ├── infrastructure.md            # OCI and server infrastructure notes
+│   ├── patch_26ai.md                # Oracle 23ai patch tracking
 │   ├── phase0_foundation.md         # Phase 0 technical documentation
+│   ├── project_summary.md           # Project summary for context restoration
+│   ├── road_map.md                  # Project phase roadmap
+│   ├── snomed_vocabulary.md         # SNOMED CT reference vocabulary
 │   ├── todo.md                      # Master todo list
-│   ├── todo_step_0_5.md             # Step 0.5 detailed todo (SQL setup)
-│   ├── todo_step_0_6.md             # Step 0.6 detailed todo (db_connection)
+│   ├── todo_step_0_4.md             # Step 0.4 detailed todo
+│   ├── todo_step_0_5.md             # Step 0.5 detailed todo
+│   ├── uzis_correspondence.md       # UZIS correspondence log
+│   ├── uzis_meeting_prep.md         # UZIS meeting preparation
 │   └── runbooks/                    # Operator runbooks — manual procedures
 │       └── run_sql_setup.md         # How to run sql/ddl/setup/ scripts
 │
 ├── sql/                             # SQL files
 │   └── ddl/                         # DDL scripts
 │       ├── setup/                   # One-time database setup — run as SYSDBA
-│       │   │                        # in numeric order before Phase 1
-│       │   ├── 00_create_profile.sql    # Create NO_EXPIRY_PROFILE
-│       │   │                            # Skip if profile already exists
-│       │   ├── 01_create_tablespaces.sql # Create TBS_SNOMED and
-│       │   │                            # TBS_SNOMED_STAGE
-│       │   ├── 02_create_schemas.sql    # Create snomed and snomed_stage
-│       │   │                            # users with profile and tablespaces
-│       │   └── 03_grants.sql            # Grant privileges to both schemas
+│       │   ├── 00_create_profile.sql
+│       │   ├── 01_create_tablespaces.sql
+│       │   ├── 02_create_schemas.sql
+│       │   └── 03_grants.sql
 │       └── tables/                  # One file per SNOMED CT table
 │                                    # Populated in Phase 1
-│                                    # 17 tables defined in database.yaml
+│
+├── wrk/                             # NOT committed to Git
+│                                    # Local scratch area: temp files,
+│                                    # clipboard output, test output.
+│                                    # commit.sh and pull.sh have moved
+│                                    # to ~/arc/ (arc workflow repo).
 │
 ├── log/                             # NOT committed to Git
 │   └── snomed.log                   # Current log (rotated daily)
@@ -90,10 +111,30 @@ project_embeddings/
 ├── venv/                            # NOT committed to Git
 │
 ├── requirements.txt
-├── syn.sh                           # rsync sync script
 ├── .gitignore
 └── LICENSE                          # BUSL 1.1 (to be added)
 ```
+
+---
+
+## File header templates
+
+Templates for file headers live in `config/templates/`. Every new file
+must start with the `ARC_FILE:` path marker (line 1) followed by the
+appropriate header template content.
+
+Available templates:
+- `config/templates/python_header.py` — Python file header
+
+Bash and SQL header templates to be added before Step 0.6.
+
+See `docs/conventions.md` for the ARC_FILE: marker convention and
+docstring style rules. Note: `python_header.py` uses Google-style
+docstrings; conventions.md mandates NumPy style. NumPy style takes
+precedence — the template will be updated to reflect this.
+
+Retrofitting existing Python files to follow the header template is
+a pending task tracked in `docs/todo.md`.
 
 ---
 
@@ -101,86 +142,25 @@ project_embeddings/
 
 ### Test scripts
 
-Pattern: `test_<component>_<language>.sh` or `test_<component>_<language>.py`
+Pattern: `test_<component>_rN_py.py` for per-round files,
+`test_<component>_py.py` for the orchestrator.
 
-The language suffix (`_sh`, `_py`) is used consistently for all test
-scripts, even when only one language test exists for a component. This
-ensures a uniform naming pattern that scales cleanly when both Bash and
-Python tests exist for the same component.
-
-| Source file | Test script |
-|-------------|-------------|
-| `scripts/common/logger.sh` | `tests/test_logger_sh.sh` |
-| `src/common/logger.py` | `tests/test_logger_py.py` |
-| `src/common/exceptions.py` | `tests/test_exceptions_py.py` |
-| `src/common/config_loader.py` | `tests/test_config_loader_py.py` |
-| `src/common/db_connection.py` | `tests/test_db_connection_py.py` |
-| `scripts/common/run.sh` | `tests/test_run_sh.sh` |
+| Source file | Orchestrator | Rounds |
+|-------------|-------------|--------|
+| `src/common/db_connection.py` | `test_db_connection_py.py` | r1–r7 |
+| `src/common/config_loader.py` | `test_config_loader_py.py` | — |
+| `src/common/logger.py` | `test_logger_py.py` | — |
+| `scripts/common/logger.sh` | `test_logger_sh.sh` | — |
+| `scripts/bootstrap.sh` | `test_bootstrap_sh.sh` | — |
 
 ### Test protocols
 
-Same name as the test script, in `tests/protocols/`, as markdown:
-
-| Test script | Protocol |
-|-------------|----------|
-| `tests/test_logger_sh.sh` | `tests/protocols/test_logger_sh.md` |
-| `tests/test_logger_py.py` | `tests/protocols/test_logger_py.md` |
+Same name as the orchestrator, in `tests/protocols/`, as markdown.
 
 ### Test results
 
 Not committed to Git. Stored locally in `tests/results/` if kept at all.
 Filename pattern: `<test_name>_<machine>_<YYYY-MM-DD>.md`
-
-Example: `tests/results/test_logger_sh_oci_2026-03-28.md`
-
----
-
-## Notes on key directories
-
-### `docs/runbooks/`
-
-Operator runbooks for manual procedures that are not part of the automated
-pipeline. Each runbook covers one procedure end to end: prerequisites,
-steps, verification queries, and follow-up actions. Runbooks are committed
-to Git and kept up to date.
-
-### `docs/`
-
-Architecture, design, and operational reference documents only. No test
-protocols or results. Updated in place — Git history preserves previous
-versions. No parallel versioned copies.
-
-### `sql/ddl/setup/`
-
-One-time setup scripts run as SYSDBA on a fresh Oracle instance. Numbered
-to make execution order unambiguous. On the OCI production instance
-NO_EXPIRY_PROFILE already exists — skip 00_create_profile.sql there.
-These scripts are not run by the Python pipeline. They are run via
-scripts/sql_setup.sh or manually following docs/runbooks/run_sql_setup.md.
-
-### `sql/ddl/tables/`
-
-One SQL file per SNOMED CT table, named to match the table name, for
-example sct_concept.sql. Populated in Phase 1. Each file creates the
-table in the production schema. The stage schema mirrors all tables
-identically during ingestion.
-
-### `tests/`
-
-All test material: executable scripts, protocols, and local results.
-Test scripts are always executed directly — never sourced. Results in
-`tests/results/` are machine-local and not committed.
-
-### `scripts/common/logger.sh`
-
-Sourced library — not executed directly. Does not set shell options,
-traps, or locale variables. Those belong in the calling script.
-
-### `log/`
-
-Machine-local. Never committed. Created automatically on first log write.
-Rotated daily by Python's `TimedRotatingFileHandler`. The subdirectory
-log/sql_setup/ is created by scripts/sql_setup.sh when first run.
 
 ---
 
@@ -197,6 +177,9 @@ __pycache__/
 # Logs
 log/
 *.log
+
+# Working scratch area
+wrk/
 
 # Test results — local only
 tests/results/*
