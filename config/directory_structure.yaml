@@ -1,0 +1,23 @@
+# ARC_FILE: config/directory_structure.yaml
+# config/directory_structure.yaml
+# =============================================================================
+# Arachnet Clinical Embeddings — Required directory structure
+# =============================================================================
+# Purpose:
+#   Single source of truth for directories that must exist before any
+#   work begins. Read by src/common/read_required_dirs.py and used
+#   by scripts/bootstrap.sh to check/create directories.
+#
+#   docs/directory_structure.md references this file as authoritative
+#   for this list. Update both together if the structure changes.
+#
+# Author:  Jan Mura
+# Version: 1.0
+# Last modified: 2026-06-08
+# =============================================================================
+
+required_directories:
+  - log
+  - wrk
+  - tests/results
+  - sql/ddl/tables

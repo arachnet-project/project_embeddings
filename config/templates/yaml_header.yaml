@@ -1,0 +1,21 @@
+# ARC_FILE: config/templates/yaml_header.yaml
+# path/to/filename.yaml
+# =============================================================================
+# Arachnet Clinical Embeddings — <description>
+# =============================================================================
+# Purpose:
+#   One or two sentences describing what this file configures or
+#   declares, and what reads it.
+#
+# Author:  Jan Mura
+# Version: <version>
+# Last modified: YYYY-MM-DD
+# --- Replace everything above with actual content before committing. ---
+# =============================================================================
+
+# Use 2-space indentation. Lowercase keys with underscores.
+# Add a comment above each section explaining its purpose.
+# Null values written as null, not ~.
+
+example_section:
+  example_key: value
