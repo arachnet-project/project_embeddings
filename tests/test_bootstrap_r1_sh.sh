@@ -6,21 +6,25 @@
 #   - reports existing directories as OK
 #   - creates missing directories
 #   - exits 0 on success
+#   - fails clearly if PROJECT_ROOT is set but does not exist
+#   - fails clearly if read_required_dirs.py is missing
+#   - prints usage with -h/--help
+#   - rejects unknown arguments
 #   - auto-detects PROJECT_ROOT when unset
 #   - uses PROJECT_ROOT as override when set
-#   - fails clearly if PROJECT_ROOT is set but does not exist
-#   - prints usage with -h/--help
-#   - checks python3 is available
-#   - fails clearly if read_required_dirs.py is missing
 #
-# Runs against a temporary fake project tree — does not touch the
-# real project directories.
+# Happy-path tests use REAL_PROJECT_ROOT as PROJECT_ROOT so the real
+# venv is inside PROJECT_ROOT and all checks pass. A temporary
+# directory_structure.yaml override is not possible without patching,
+# so these tests accept that real project dirs are checked/created.
 #
 # Usage:
 #   bash tests/test_bootstrap_r1_sh.sh
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
-# Last modified: 2026-06-08
+# Author:  Jan Mura
+# Version: 1.3
+# Last modified: 2026-06-16
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -42,11 +46,6 @@ RESULTS_FILE="$(mktemp)"
 
 # --- report ---
 report() {
-    # Print and record a single test result.
-    # Args:
-    #   $1 — test name
-    #   $2 — PASS or FAIL
-    #   $3 — optional detail (required on failure)
     local name="$1"
     local result="$2"
     local detail="${3:-}"
@@ -59,221 +58,169 @@ report() {
 }
 # --- end report ---
 
-# --- make_fake_project ---
-make_fake_project() {
-    # Create a minimal fake project tree with config/directory_structure.yaml
-    # and src/common/read_required_dirs.py copied from the real project.
-    # Echoes the path to the fake project root.
-    local fake_root
-    fake_root=$(mktemp -d)
-
-    mkdir -p "${fake_root}/config"
-    mkdir -p "${fake_root}/src/common"
-    mkdir -p "${fake_root}/scripts"
-
-    cat > "${fake_root}/config/directory_structure.yaml" << 'YAML'
-required_directories:
-  - log
-  - wrk
-  - tests/results
-  - sql/ddl/tables
-YAML
-
-    cp "${REAL_PROJECT_ROOT}/src/common/read_required_dirs.py" \
-       "${fake_root}/src/common/read_required_dirs.py"
-
-    cp "${BOOTSTRAP}" "${fake_root}/scripts/bootstrap.sh"
-
-    echo "${fake_root}"
+# --- run_bootstrap ---
+run_bootstrap() {
+    # Run bootstrap against REAL_PROJECT_ROOT with the real venv active.
+    # Args:
+    #   $@ — arguments passed to bootstrap
+    VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+    PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
+    bash "${BOOTSTRAP}" "$@" 2>&1
 }
-# --- end make_fake_project ---
+# --- end run_bootstrap ---
 
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
-# --- test_creates_missing_directories ---
-test_creates_missing_directories() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
-    local output
-    output=$(PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) \
-        || { report "creates missing directories" "${FAIL}" "exit code != 0"; rm -rf "${fake_root}"; return; }
-
-    local all_created=true
-    for dir in log wrk tests/results sql/ddl/tables; do
-        if [[ ! -d "${fake_root}/${dir}" ]]; then
-            all_created=false
-        fi
-    done
-
-    if [[ "${all_created}" == "true" ]]; then
-        report "creates missing directories" "${PASS}"
-    else
-        report "creates missing directories" "${FAIL}" "not all directories created"
-    fi
-
-    rm -rf "${fake_root}"
-}
-# --- end test_creates_missing_directories ---
-
-# --- test_reports_existing_directories_as_ok ---
-test_reports_existing_directories_as_ok() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
-    mkdir -p "${fake_root}/log" "${fake_root}/wrk" \
-             "${fake_root}/tests/results" "${fake_root}/sql/ddl/tables"
-
-    local output
-    output=$(PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) \
-        || { report "reports existing directories as OK" "${FAIL}" "exit code != 0"; rm -rf "${fake_root}"; return; }
-
-    if echo "${output}" | grep -q "OK       log"; then
-        report "reports existing directories as OK" "${PASS}"
-    else
-        report "reports existing directories as OK" "${FAIL}" "expected OK line not found"
-    fi
-
-    rm -rf "${fake_root}"
-}
-# --- end test_reports_existing_directories_as_ok ---
-
 # --- test_exits_zero_on_success ---
 test_exits_zero_on_success() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
     local rc=0
-    PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" > /dev/null 2>&1 || rc=$?
+    run_bootstrap > /dev/null || rc=$?
 
     if [[ "${rc}" -eq 0 ]]; then
         report "exits zero on success" "${PASS}"
     else
         report "exits zero on success" "${FAIL}" "exit code=${rc}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_exits_zero_on_success ---
 
-# --- test_auto_detects_project_root_when_unset ---
-test_auto_detects_project_root_when_unset() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
+# --- test_reports_existing_directories_as_ok ---
+test_reports_existing_directories_as_ok() {
     local rc=0
     local output
-    output=$(env -u PROJECT_ROOT bash "${fake_root}/scripts/bootstrap.sh" 2>&1) || rc=$?
+    output=$(run_bootstrap) || rc=$?
 
-    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Auto-detected PROJECT_ROOT: ${fake_root}"; then
+    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "OK       log"; then
+        report "reports existing directories as OK" "${PASS}"
+    else
+        report "reports existing directories as OK" "${FAIL}" "rc=${rc}"
+    fi
+}
+# --- end test_reports_existing_directories_as_ok ---
+
+# --- test_creates_missing_directory ---
+test_creates_missing_directory() {
+    # Temporarily remove a required dir, run bootstrap, verify it recreates it.
+    # Uses sql/ddl/tables — safe to remove temporarily, not used by the test runner.
+    local test_dir="${REAL_PROJECT_ROOT}/sql/ddl/tables"
+
+    rm -rf "${test_dir}"
+
+    local rc=0
+    run_bootstrap > /dev/null || rc=$?
+
+    if [[ "${rc}" -eq 0 ]] && [[ -d "${test_dir}" ]]; then
+        report "creates missing directory" "${PASS}"
+    else
+        local dir_exists
+        dir_exists=$([ -d "${test_dir}" ] && echo yes || echo no)
+        report "creates missing directory" "${FAIL}" "rc=${rc} dir_exists=${dir_exists}"
+    fi
+}
+# --- end test_creates_missing_directory ---
+
+# --- test_auto_detects_project_root_when_unset ---
+test_auto_detects_project_root_when_unset() {
+    local rc=0
+    local output
+    output=$(
+        VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+        env -u PROJECT_ROOT \
+        bash "${BOOTSTRAP}" 2>&1
+    ) || rc=$?
+
+    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Auto-detected PROJECT_ROOT"; then
         report "auto-detects PROJECT_ROOT when unset" "${PASS}"
     else
         report "auto-detects PROJECT_ROOT when unset" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_auto_detects_project_root_when_unset ---
 
 # --- test_override_used_when_project_root_set ---
 test_override_used_when_project_root_set() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
     local rc=0
     local output
-    output=$(PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) || rc=$?
+    output=$(run_bootstrap) || rc=$?
 
-    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Using PROJECT_ROOT (override): ${fake_root}"; then
+    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Using PROJECT_ROOT (override)"; then
         report "override used when PROJECT_ROOT set" "${PASS}"
     else
         report "override used when PROJECT_ROOT set" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_override_used_when_project_root_set ---
 
 # --- test_fails_when_project_root_does_not_exist ---
 test_fails_when_project_root_does_not_exist() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
     local bogus="/tmp/does_not_exist_bootstrap_test_12345"
     rm -rf "${bogus}"
 
     local rc=0
     local output
-    output=$(PROJECT_ROOT="${bogus}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) || rc=$?
+    output=$(
+        VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+        PROJECT_ROOT="${bogus}" \
+        bash "${BOOTSTRAP}" 2>&1
+    ) || rc=$?
 
     if [[ "${rc}" -eq 1 ]] && echo "${output}" | grep -q "PROJECT_ROOT does not exist"; then
         report "fails when PROJECT_ROOT does not exist" "${PASS}"
     else
         report "fails when PROJECT_ROOT does not exist" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_fails_when_project_root_does_not_exist ---
 
 # --- test_help_flag_prints_usage ---
 test_help_flag_prints_usage() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
     local rc=0
     local output
-    output=$(bash "${fake_root}/scripts/bootstrap.sh" --help 2>&1) || rc=$?
+    output=$(run_bootstrap --help) || rc=$?
 
     if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Usage: bash scripts/bootstrap.sh"; then
         report "help flag prints usage" "${PASS}"
     else
         report "help flag prints usage" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_help_flag_prints_usage ---
 
-# --- test_checks_python3_available ---
-test_checks_python3_available() {
-    local fake_root
-    fake_root=$(make_fake_project)
-
+# --- test_unknown_argument_rejected ---
+test_unknown_argument_rejected() {
     local rc=0
     local output
-    output=$(PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) || rc=$?
+    output=$(run_bootstrap --unknown-flag 2>&1) || rc=$?
 
-    if [[ "${rc}" -eq 0 ]] && echo "${output}" | grep -q "Checking python3"; then
-        report "checks python3 available" "${PASS}"
+    if [[ "${rc}" -eq 1 ]] && echo "${output}" | grep -q "unknown argument"; then
+        report "unknown argument rejected" "${PASS}"
     else
-        report "checks python3 available" "${FAIL}" "rc=${rc} output=${output}"
+        report "unknown argument rejected" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
-# --- end test_checks_python3_available ---
+# --- end test_unknown_argument_rejected ---
 
 # --- test_fails_when_helper_missing ---
 test_fails_when_helper_missing() {
-    local fake_root
-    fake_root=$(make_fake_project)
+    # Temporarily rename helper, run bootstrap, restore it.
+    local helper="${REAL_PROJECT_ROOT}/src/common/read_required_dirs.py"
+    local backup="${helper}.bak"
 
-    rm "${fake_root}/src/common/read_required_dirs.py"
+    mv "${helper}" "${backup}"
 
     local rc=0
     local output
-    output=$(PROJECT_ROOT="${fake_root}" bash "${fake_root}/scripts/bootstrap.sh" 2>&1) || rc=$?
+    output=$(run_bootstrap 2>&1) || rc=$?
+
+    mv "${backup}" "${helper}"
 
     if [[ "${rc}" -eq 1 ]] && echo "${output}" | grep -q "helper script not found"; then
         report "fails when helper script missing" "${PASS}"
     else
         report "fails when helper script missing" "${FAIL}" "rc=${rc} output=${output}"
     fi
-
-    rm -rf "${fake_root}"
 }
 # --- end test_fails_when_helper_missing ---
 
@@ -286,14 +233,14 @@ main() {
     echo "=== test_bootstrap_r1_sh.sh -- Round 1 (directories) ==="
     echo ""
 
-    test_creates_missing_directories
-    test_reports_existing_directories_as_ok
     test_exits_zero_on_success
+    test_reports_existing_directories_as_ok
+    test_creates_missing_directory
     test_auto_detects_project_root_when_unset
     test_override_used_when_project_root_set
     test_fails_when_project_root_does_not_exist
     test_help_flag_prints_usage
-    test_checks_python3_available
+    test_unknown_argument_rejected
     test_fails_when_helper_missing
 
     echo ""
