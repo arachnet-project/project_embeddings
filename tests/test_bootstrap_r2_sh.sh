@@ -25,8 +25,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.4
-# Last modified: 2026-07-08
+# Version: 1.5
+# Last modified: 2026-07-10
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -45,6 +45,22 @@ RESULTS_FILE="$(mktemp)"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# --- detect_venv_dir ---
+detect_venv_dir() {
+    # Find whichever immediate subdirectory of REAL_PROJECT_ROOT contains
+    # bin/activate. Returns the path without trailing slash.
+    # Exits 1 with a message if none found.
+    local d
+    for d in "${REAL_PROJECT_ROOT}"/*/; do
+        [[ -f "${d}bin/activate" ]] && echo "${d%/}" && return 0
+    done
+    echo "bootstrap test: no venv found under ${REAL_PROJECT_ROOT}" >&2
+    return 1
+}
+# --- end detect_venv_dir ---
+
+REAL_VENV="$(detect_venv_dir)"
 
 # --- report ---
 report() {
@@ -147,17 +163,19 @@ test_fails_when_venv_outside_project_root() {
 # --- test_succeeds_when_valid_venv_inside_project_root ---
 test_succeeds_when_valid_venv_inside_project_root() {
     # Use REAL_PROJECT_ROOT so venv IS inside PROJECT_ROOT and
-    # sys.executable passes check_python3.
+    # sys.executable passes check_python3. Uses REAL_VENV (discovered
+    # via detect_venv_dir) rather than a hardcoded name, since the venv
+    # is named "venv" on Ubuntu and "wenv" on OCI.
     local rc=0
     local output
     output=$(
-        VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+        VIRTUAL_ENV="${REAL_VENV}" \
         PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
         bash "${BOOTSTRAP}" 2>&1
     ) || rc=$?
 
     if [[ "${rc}" -eq 0 ]] \
-        && echo "${output}" | grep -q "OK       ${REAL_PROJECT_ROOT}/venv"; then
+        && echo "${output}" | grep -q "OK       ${REAL_VENV}"; then
         report "succeeds when valid venv inside PROJECT_ROOT" "${PASS}"
     else
         report "succeeds when valid venv inside PROJECT_ROOT" "${FAIL}" "rc=${rc} output=${output}"
@@ -167,26 +185,33 @@ test_succeeds_when_valid_venv_inside_project_root() {
 
 # --- test_accepts_non_standard_venv_name ---
 test_accepts_non_standard_venv_name() {
-    # Symlink real venv as "wenv" inside REAL_PROJECT_ROOT so both
-    # check_venv and check_python3 pass.
-    local wenv="${REAL_PROJECT_ROOT}/wenv"
-    ln -sfn "${REAL_PROJECT_ROOT}/venv" "${wenv}"
+    # Symlink the real venv (REAL_VENV, whatever it's actually named)
+    # under a clearly artificial alternate name, so both check_venv
+    # and check_python3 pass regardless of the real venv's own name.
+    # The alternate name is deliberately distinct from both "venv" and
+    # "wenv" so it can never collide with the real venv directory on
+    # either Ubuntu or OCI — a previous version hardcoded "wenv" as
+    # the alternate name, which collided with OCI's real venv
+    # (already named "wenv") and crashed the whole test run when
+    # cleanup tried to `rm -f` a real directory.
+    local alt_venv="${REAL_PROJECT_ROOT}/alt_venv_link_test"
+    ln -sfn "${REAL_VENV}" "${alt_venv}"
 
     local rc=0
     local output
     output=$(
-        VIRTUAL_ENV="${wenv}" \
+        VIRTUAL_ENV="${alt_venv}" \
         PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
         bash "${BOOTSTRAP}" 2>&1
     ) || rc=$?
 
-    rm -f "${wenv}"
+    rm -f "${alt_venv}"
 
     if [[ "${rc}" -eq 0 ]] \
-        && echo "${output}" | grep -q "OK       ${wenv}"; then
-        report "accepts non-standard venv name (wenv)" "${PASS}"
+        && echo "${output}" | grep -q "OK       ${alt_venv}"; then
+        report "accepts non-standard venv name (alt_venv_link_test)" "${PASS}"
     else
-        report "accepts non-standard venv name (wenv)" "${FAIL}" "rc=${rc} output=${output}"
+        report "accepts non-standard venv name (alt_venv_link_test)" "${FAIL}" "rc=${rc} output=${output}"
     fi
 }
 # --- end test_accepts_non_standard_venv_name ---
