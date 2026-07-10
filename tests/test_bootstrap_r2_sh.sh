@@ -15,13 +15,18 @@
 # Happy-path tests use REAL_PROJECT_ROOT as PROJECT_ROOT so the real
 # venv is genuinely inside PROJECT_ROOT.
 #
+# The outside-PROJECT_ROOT fixture includes a bin/activate file so it
+# passes bootstrap.sh's structural venv-validity check (added v1.7)
+# and correctly falls through to the PROJECT_ROOT containment check
+# this test is actually exercising.
+#
 # Usage:
 #   bash tests/test_bootstrap_r2_sh.sh
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.3
-# Last modified: 2026-06-16
+# Version: 1.4
+# Last modified: 2026-07-08
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -116,6 +121,10 @@ test_fails_when_venv_outside_project_root() {
     local outside_venv
     outside_venv=$(mktemp -d)
     mkdir -p "${outside_venv}/bin"
+    # bin/activate must exist so the fixture passes bootstrap.sh's
+    # structural venv-validity check and falls through to the
+    # PROJECT_ROOT containment check this test actually targets.
+    touch "${outside_venv}/bin/activate"
 
     local rc=0
     local output

@@ -30,8 +30,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.0
-# Last modified: 2026-07-05
+# Version: 1.1
+# Last modified: 2026-07-06
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -51,6 +51,22 @@ RESULTS_FILE="$(mktemp)"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# --- detect_venv_dir ---
+detect_venv_dir() {
+    # Find whichever immediate subdirectory of REAL_PROJECT_ROOT contains
+    # bin/activate. Returns the path without trailing slash.
+    # Exits 1 with a message if none found.
+    local d
+    for d in "${REAL_PROJECT_ROOT}"/*/; do
+        [[ -f "${d}bin/activate" ]] && echo "${d%/}" && return 0
+    done
+    echo "bootstrap test: no venv found under ${REAL_PROJECT_ROOT}" >&2
+    return 1
+}
+# --- end detect_venv_dir ---
+
+REAL_VENV="$(detect_venv_dir)"
 
 # --- report ---
 report() {
@@ -80,7 +96,7 @@ run_bootstrap() {
     fi
 
     PATH="${path_prefix}${PATH}" \
-    VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+    VIRTUAL_ENV="${REAL_VENV}" \
     PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
     bash "${BOOTSTRAP}" 2>&1
 }
@@ -119,7 +135,7 @@ run_bootstrap_with_path() {
     local full_path="$1"
 
     PATH="${full_path}" \
-    VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+    VIRTUAL_ENV="${REAL_VENV}" \
     PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
     bash "${BOOTSTRAP}" 2>&1
 }
@@ -277,7 +293,7 @@ PYSCRIPT
     if [[ "${rc}" -eq 1 ]] \
         && echo "${output}" | grep -q "python3 is not from the active venv" \
         && echo "${output}" | grep -q "python3 reports: /opt/not-a-venv/bin/python3" \
-        && echo "${output}" | grep -q "expected inside: ${REAL_PROJECT_ROOT}/venv"; then
+        && echo "${output}" | grep -q "expected inside: ${REAL_VENV}"; then
         report "fails when python3 is outside the active venv" "${PASS}"
     else
         report "fails when python3 is outside the active venv" "${FAIL}" "rc=${rc} output=${output}"

@@ -23,8 +23,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.3
-# Last modified: 2026-06-16
+# Version: 1.4
+# Last modified: 2026-07-06
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -43,6 +43,22 @@ RESULTS_FILE="$(mktemp)"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# --- detect_venv_dir ---
+detect_venv_dir() {
+    # Find whichever immediate subdirectory of REAL_PROJECT_ROOT contains
+    # bin/activate. Returns the path without trailing slash.
+    # Exits 1 with a message if none found.
+    local d
+    for d in "${REAL_PROJECT_ROOT}"/*/; do
+        [[ -f "${d}bin/activate" ]] && echo "${d%/}" && return 0
+    done
+    echo "bootstrap test: no venv found under ${REAL_PROJECT_ROOT}" >&2
+    return 1
+}
+# --- end detect_venv_dir ---
+
+REAL_VENV="$(detect_venv_dir)"
 
 # --- report ---
 report() {
@@ -63,7 +79,7 @@ run_bootstrap() {
     # Run bootstrap against REAL_PROJECT_ROOT with the real venv active.
     # Args:
     #   $@ — arguments passed to bootstrap
-    VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+    VIRTUAL_ENV="${REAL_VENV}" \
     PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
     bash "${BOOTSTRAP}" "$@" 2>&1
 }
@@ -103,19 +119,29 @@ test_reports_existing_directories_as_ok() {
 # --- test_creates_missing_directory ---
 test_creates_missing_directory() {
     # Temporarily remove a required dir, run bootstrap, verify it recreates it.
-    # Uses sql/ddl/tables — safe to remove temporarily, not used by the test runner.
+    # Uses sql/ddl/tables — safe to remove temporarily, not used by test runner.
+    # Restores .gitkeep after the test to keep the repo clean.
     local test_dir="${REAL_PROJECT_ROOT}/sql/ddl/tables"
+    local gitkeep="${test_dir}/.gitkeep"
+    local had_gitkeep=0
+    [[ -f "${gitkeep}" ]] && had_gitkeep=1
 
     rm -rf "${test_dir}"
 
     local rc=0
     run_bootstrap > /dev/null || rc=$?
 
-    if [[ "${rc}" -eq 0 ]] && [[ -d "${test_dir}" ]]; then
+    local dir_exists=0
+    [[ -d "${test_dir}" ]] && dir_exists=1
+
+    # Restore .gitkeep if it existed before the test.
+    if [[ "${had_gitkeep}" -eq 1 && "${dir_exists}" -eq 1 ]]; then
+        touch "${gitkeep}"
+    fi
+
+    if [[ "${rc}" -eq 0 ]] && [[ "${dir_exists}" -eq 1 ]]; then
         report "creates missing directory" "${PASS}"
     else
-        local dir_exists
-        dir_exists=$([ -d "${test_dir}" ] && echo yes || echo no)
         report "creates missing directory" "${FAIL}" "rc=${rc} dir_exists=${dir_exists}"
     fi
 }
@@ -126,7 +152,7 @@ test_auto_detects_project_root_when_unset() {
     local rc=0
     local output
     output=$(
-        VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+        VIRTUAL_ENV="${REAL_VENV}" \
         env -u PROJECT_ROOT \
         bash "${BOOTSTRAP}" 2>&1
     ) || rc=$?
@@ -161,7 +187,7 @@ test_fails_when_project_root_does_not_exist() {
     local rc=0
     local output
     output=$(
-        VIRTUAL_ENV="${REAL_PROJECT_ROOT}/venv" \
+        VIRTUAL_ENV="${REAL_VENV}" \
         PROJECT_ROOT="${bogus}" \
         bash "${BOOTSTRAP}" 2>&1
     ) || rc=$?
