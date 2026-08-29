@@ -1,263 +1,323 @@
-# Development Workflow — Arachnet Clinical Embeddings
+# ARC_FILE: docs/dev_workflow.md
 
-**Document version:** 1.2
-**Date:** 2026-05-21
+# ACE — Development Workflow
 
----
+# Version: 2.2
 
-## Overview
+# Status: Approved
 
-Primary development machine: Ubuntu.
-Production machine: OCI Frankfurt (Oracle Linux 9, Oracle Database 23ai).
-All code flows through GitHub — never directly between machines.
+## 1. Purpose
 
-The workflow follows a simple cycle:
-write on Ubuntu → test on Ubuntu → push to GitHub → pull on OCI → verify on OCI.
+This document defines the general development workflow for ACE.
 
----
+The workflow requires:
 
-## Shell aliases and functions
+* Verification against the live repository.
+* Agreement before implementation.
+* Explicit recording of decisions and plan changes.
+* Preservation of existing work.
+* Appropriate testing.
+* Small, coherent commits.
+* Formal session opening and close-out.
 
-The following aliases and functions are defined in `~/.bashrc` on Ubuntu
-and OCI. They are the standard way to interact with the project shell.
-The canonical `.bashrc` source is managed manually — update all machines
-when aliases change.
+## 2. Sources of authority
 
-### Project entry
+The live repository is the primary source of truth for files,
+implementation state, Git state, and recorded test evidence.
 
-    ace     cd ~/project_embeddings && source venv/bin/activate
+Project-control documents, conversation summaries, and human or AI
+memory provide context, but they do not override verifiable repository
+state.
 
-### Clipboard helpers (Ubuntu — xclip based)
+When two sources disagree:
 
-    xi      Read from clipboard (xclip -selection clipboard -o)
-    xo      Write to clipboard (xclip -selection clipboard -i)
-    xed     Open clipboard content in vim, write result back to clipboard
-    xcat    Print clipboard content to terminal
-    xclear  Clear clipboard
+1. Verify the claim against the applicable files, Git history,
+   configuration, tests, or runtime environment.
+2. State the discrepancy explicitly.
+3. Do not silently choose one account.
+4. If verification does not resolve the issue, record it as unresolved
+   and ask Jan before acting.
 
-### File helpers
+A material claim that can reasonably be checked must be checked before
+it is used as the basis for a decision or change.
 
-    xcf     Copy file path to clipboard
-    xcaf    Copy file content to clipboard
+## 3. Project-control documents
 
-### Test and run helpers
+ACE uses exactly two project-control documents:
 
-    xbash   Run clipboard content as bash, output to terminal and CB
-    xpy     Run clipboard content as python, output to terminal and CB
-    xrun    Run clipboard content as bash with venv active
-    xcom    Run wrk/commit.sh (git stage/commit/push)
-    xpull   Run wrk/pull.sh (git pull + status)
+* `docs/project_summary.md`
+* `docs/todo.md`
 
-### OCI transfer
+No other project-control document may be used unless this workflow is
+explicitly revised and approved first.
 
-    xsup    rsync upload: Ubuntu → OCI transfer directory
-    xsd     rsync download: OCI transfer directory → Ubuntu
+### 3.1 `docs/project_summary.md`
 
-### Workflow pattern
+`docs/project_summary.md` records the outcome and resulting state of
+the most recently closed substantial session.
 
-The typical inner loop on Ubuntu:
+It must contain:
 
-1. Claude produces code or a test in chat.
-2. `xed` — paste into vim, review, edit if needed, save.
-3. `xbash` or `xpy` — run it directly from clipboard.
-4. Read output. Fix in chat or in vim. Repeat.
-5. When passing, `xcom` — commit and push.
+* Material work completed.
+* Decisions approved.
+* Verification performed.
+* Repository state at session close.
+* Preserved working-tree changes.
+* Unresolved issues.
+* The immediate next step.
 
----
+The project summary normally remains unchanged during active work. It
+is updated during session close-out from verified repository state,
+not from conversational memory alone.
 
-## Where to test what
+### 3.2 `docs/todo.md`
 
-### Test on Ubuntu only
+`docs/todo.md` records the present and near future.
 
-Any code that does not require Oracle or OCI infrastructure:
+It must contain:
 
-- `src/common/exceptions.py` — pure Python, no dependencies
-- `src/common/logger.py` — reads environment variables, writes files
-- `src/common/config_loader.py` — reads YAML, no database
-- Unit tests of individual functions in ingestion scripts
-- Any data transformation logic (Parquet, pandas, RF2 parsing)
+* The current work plan.
+* Work status.
+* Current decisions.
+* Blockers and unresolved questions.
+* Approved next actions.
+* Deferred work and backlog items.
+* Rejected and superseded items that must remain recorded.
+* Material changes to the agreed plan.
 
-These tests run fast, require no network, and can be iterated rapidly.
-If a test does not need Oracle, it must not need Oracle.
+It must be updated after a logical work unit whenever the project
+state or plan has materially changed. It must be brought fully up to
+date during session close-out.
 
-### Test on both Ubuntu and OCI
+Both control documents are tracked in Git. Both must be updated,
+reviewed, committed, and pushed before a substantial session is
+declared closed.
 
-Code that has Oracle-independent logic worth unit testing, but also
-needs real database verification:
+## 4. Session opening
 
-- `src/common/db_connection.py` — mock-based unit tests on Ubuntu,
-  real connection tests on OCI
-- RF2 file loading logic — file parsing on Ubuntu, actual INSERT on OCI
+At the beginning of a substantial session:
 
-### Test on OCI only
+1. Read `docs/dev_workflow.md`.
+2. Read `docs/project_summary.md`.
+3. Confirm the live repository state, including:
 
-Anything that requires a live Oracle 23ai connection:
+   * repository path,
+   * current branch,
+   * `git status`,
+   * recent Git history,
+   * relationship between `HEAD` and `origin/main`.
+4. Read `docs/todo.md`.
+5. Compare the control documents with the verified repository state.
+6. State every material discrepancy.
+7. Agree on the session objective and immediate work units.
 
-- Schema creation and DDL execution
-- Actual data loading (executemany, APPEND hint, commit)
-- Stage-to-production swap (schema rename)
-- Validation checks (COUNT queries, referential integrity SQL)
-- Full pipeline integration tests (end-to-end ingestion run)
+Additional files and directory structure must be inspected when
+required by the agreed work. A full recursive directory listing is not
+required at every session opening.
 
----
+## 5. Planning and work status
 
-## Daily workflow
+Work must proceed in logical units with a clear intended outcome.
 
-### Beginning of work session
+The normal progression is:
 
-    ace                         # cd to project + activate venv
-    xpull                       # pull latest from GitHub
-    git log --oneline -3        # confirm current commit
+* `Proposed` — suggested but not approved.
+* `Agreed` — approved but not yet applied.
+* `Applied` — changed in the working tree.
+* `Tested` — required verification has passed.
+* `Committed` — included in a reviewed local commit.
+* `Pushed` — present on the approved remote branch.
 
-Check `docs/todo.md` for current task before writing any code.
-At the start of each Claude session, open a new chat within the ACE
-project — memory carries over automatically.
+The terminal outcomes are:
 
-### Writing and testing a unit (Ubuntu)
+* `Rejected` — considered and explicitly not accepted.
+* `Superseded` — replaced by a later approved decision or work item.
 
-1. Write or modify the function in Vim.
-2. Run the relevant test script immediately:
+The status modifiers are:
 
-       python tests/test_<component>_py.py 2>&1 | tee log/test_run.txt
+* `Blocked` — cannot proceed because of an unresolved obstacle or
+  dependency.
+* `Deferred` — deliberately postponed although it could proceed.
 
-   Or using the clipboard loop: write test in Claude → `xpy` → read output.
+`Blocked` and `Deferred` do not replace the work item’s current
+lifecycle state.
 
-3. Read the output. Fix failures. Repeat until all checks pass.
-4. If the function is complete and all tests pass, move to the next
-   function. Do not push partial work.
+A document may be described as `Reviewed` or `Approved` when those
+terms are more accurate than `Tested`.
 
-### End of Ubuntu work session
+No work is complete merely because it was discussed or written.
+Agreement, application, verification, commit, and push are separate
+events.
 
-    # Run all tests changed today
-    python tests/test_exceptions_py.py
-    python tests/test_logger_py.py
-    bash tests/test_logger_sh.sh
-    python tests/test_config_loader_py.py
+Rejected and superseded items must be recorded in `docs/todo.md`.
+Material outcomes must also be preserved in
+`docs/project_summary.md` during session close-out.
 
-    # Update wrk/commit.sh — set msg= and files=() then:
-    xcom
+## 6. Decisions and changes of plan
 
-    # Update todo.md before closing
-    vim docs/todo.md
-    # set msg and files in commit.sh, then:
-    xcom
+Material decisions must be recorded when they are made rather than
+reconstructed only at session close.
 
-### OCI verification (after Ubuntu push)
+A material departure from the agreed plan must be stated when it
+occurs and recorded in `docs/todo.md`. This includes:
 
-Run OCI verification when:
-- Any file that touches Oracle was changed
-- A full phase step is complete
-- Before marking a step Complete in phase0_foundation.md
+* Starting an unplanned task.
+* Expanding a task substantially beyond its agreed scope.
+* Postponing or replacing an agreed work unit.
+* Discovering a blocker that changes the planned order.
 
-    # On OCI
-    ace
-    xpull
+Minor investigation within an agreed work unit does not require a
+separate deviation record unless it changes scope, risk, affected
+files, or expected results.
 
-    # Run platform-independent tests
-    python tests/test_exceptions_py.py
-    python tests/test_logger_py.py
+## 7. File changes
 
-    # Run OCI-specific tests when they exist
-    SNOMED_TEST_REAL_DB=true python tests/test_db_connection_py.py
+Before modifying a file:
 
----
+1. Read the current file.
+2. Check its Git status.
+3. Identify existing changes that must be preserved.
+4. Confirm that the modification belongs to the agreed work unit.
 
-## Test naming and location
+Existing work must not be overwritten, discarded, staged, or committed
+without review.
 
-What / Where / When to run:
+Changes must be grouped into small, coherent commits. Unrelated
+documentation, implementation, tests, generated files, and cleanup
+must not be combined merely because they are present in the working
+tree.
 
-Unit test, pure Python — tests/test_<x>_py.py — Ubuntu, every change
-Unit test, Bash script — tests/test_<x>_sh.sh — Ubuntu, every change
-Integration test, Oracle — tests/test_<x>_py.py — OCI, after push
-Protocol (what to expect) — tests/protocols/test_<x>.md — Reference
-Results record — tests/results/test_<x>_<machine>_<date>.txt — After each run
+Before committing:
 
-Test results go in `tests/results/` — not committed to Git (in .gitignore).
-Protocols go in `tests/protocols/` — committed to Git, updated when
-test scope changes.
+1. Review the exact files to be included.
+2. Review the staged diff.
+3. Check for unintended files, whitespace damage, permission changes,
+   and secrets.
+4. Run verification appropriate to the change.
+5. Ensure that only approved files are included.
 
----
+Commit messages must begin with exactly one of these approved prefixes:
 
-## Commit discipline
+* `docs:` — documentation-only changes.
+* `fix:` — correction of defective implementation behavior.
+* `test:` — test or verification changes without a corresponding
+  implementation change.
+* `chore:` — repository maintenance that does not change product
+  behavior.
+* `feat:` — new or materially expanded product behavior.
 
-Commit one logical unit at a time. A logical unit is:
-- One function completed and tested
-- One bug fixed and verified
-- One document updated
-- One configuration change
+No other commit-message prefix may be used.
 
-Do not accumulate a day's work into one large commit. Small commits
-make failures easier to isolate and revert.
+If a change does not fit one of these categories, work must stop until
+the correct classification is agreed. Adding or changing a prefix
+requires an explicit revision of this workflow.
 
-Never commit:
-- Code with failing tests
-- Sensitive data (passwords, API keys)
-- Log files or test output
-- Virtual environment files
-- Session JSON or transcript files
+Published Git history must not be rewritten merely to correct a
+harmless commit-message typo.
 
-Commit message format follows Conventional Commits.
-See `docs/git_workflow.md` for the full convention and examples.
+## 8. Testing and evidence
 
----
+Testing must match the scope and risk of the change.
 
-## Handling a failed OCI test
+A work unit may be marked `Tested` only after its required verification
+has passed.
 
-If a test passes on Ubuntu but fails on OCI:
+Tests requiring an external service or specialized environment must
+be distinguished from local or simulated tests. Claims about such
+testing must be supported by recorded evidence.
 
-1. Read the error carefully — is it Oracle-specific or environment-specific?
-2. Check environment variables on OCI: echo $SNOMED_LOG_DIR, echo $TNS_ADMIN
-3. Check the OCI log file: tail -50 log/snomed.log
-4. If it is a code bug, fix on Ubuntu, push, pull on OCI, retest.
-5. If it is an environment issue (missing variable, wrong path), fix
-   .bashrc on OCI and source ~/.bashrc.
-6. Never fix code directly on OCI — always fix on Ubuntu and push.
-   OCI is a receiver, never an editor.
+Tests must use isolated fixtures. They must not modify real project
+configuration or user data unless the exception is explicitly
+discussed and approved before the test is run.
 
-Rule: OCI never edits code. Ubuntu never runs Oracle tests.
+Commands, results, environments, and failures must be recorded when
+they have lasting value for later verification or development.
 
----
+## 9. Machine roles
 
-## Marking a step Complete
+ACE machine roles are strict and non-symmetric:
 
-A step in `docs/phase0_foundation.md` is marked Complete only when:
+* Ubuntu is the primary development machine and the sole push machine.
+* OCI Frankfurt is the pull-only real-database verification
+  environment.
+* macOS machines are pull-only and auxiliary.
 
-1. All test scripts for that step pass on Ubuntu.
-2. All test scripts for that step pass on OCI.
-3. All outputs listed in the step's Outputs section exist and are
-   committed to Git.
-4. `docs/todo.md` reflects the completed state.
-5. A final commit with message `feat: Step X.Y complete` is pushed.
+Machine roles may change only through an explicit, approved revision of
+this workflow.
 
----
+Work produced on a pull-only machine must follow the approved transfer
+route to Ubuntu before it is committed or pushed.
 
-## Weekly rhythm (suggested)
+Machine-specific paths, environments, and configuration must be
+verified rather than assumed.
 
-Monday: Pull on both machines. Review docs/todo.md. Plan the week's
-target — which step or function to complete.
+## 10. Shell-command and Bash-script handling
 
-During the week: Write, test, commit, push on Ubuntu daily.
-Pull and verify on OCI at least twice — midweek and end of week.
+A single independent shell command may be presented as an individual
+command.
 
-Friday: Ensure all work is pushed and OCI is current. Update
-docs/todo.md with the week's progress. Note any blockers or decisions
-needed.
+Two or more related shell commands intended to be run in sequence must
+be presented as one Bash script. The commands must not be distributed
+across prose or multiple command blocks.
 
----
+Every Bash script must conform to `docs/conventions.md`.
 
-## Quick reference — commands
+The script must:
 
-    ace                                     # enter project on any machine
-    xpull                                   # pull latest
-    xpy                                     # run clipboard as python
-    xbash                                   # run clipboard as bash
-    xcom                                    # commit and push via commit.sh
-    python tests/test_X_py.py 2>&1 | tee log/test_run.txt   # run a test
+* Include a brief description of its purpose.
+* Identify the intended machine and working directory.
+* Execute commands in the required order.
+* Stop safely when a prerequisite or verification fails.
+* Avoid destructive operations unless their exact targets and effects
+  have been verified and explicitly approved.
+* Display enough information for its result to be reviewed.
 
----
+Command output must be evaluated before any dependent script is
+prepared or run.
 
-## Attribution
+When a response contains a Bash script that has not yet been run, the
+script must appear at the end of the response as the complete pending
+command sequence. Commands already run must not be included in it.
 
-This material includes SNOMED Clinical Terms (SNOMED CT) which is used
-by permission of SNOMED International. SNOMED and SNOMED CT are
-registered trademarks of SNOMED International.
+## 11. Session close-out
+
+A substantial session is not formally closed until its work and
+repository state have been reconciled.
+
+Session close-out must:
+
+1. Review the agreed work units and set their current statuses.
+2. Confirm the repository path, branch, status, recent history, and
+   relationship to `origin/main`.
+3. Verify the files and tests relevant to the completed work.
+4. Update `docs/todo.md` with completed work, unfinished work,
+   blockers, unresolved issues, backlog, and the next intended work.
+5. Update `docs/project_summary.md` from verified repository evidence.
+6. Review the changes to both control documents.
+7. Commit both control documents, together or in an approved sequence
+   of coherent commits.
+8. Push the approved commits from Ubuntu to `origin/main`.
+9. Verify the final relationship between local `HEAD` and
+   `origin/main`.
+10. Record every preserved uncommitted working-tree change explicitly.
+
+If the control documents cannot be updated, committed, and pushed, the
+session is interrupted or awaiting close-out rather than closed.
+
+## 12. Automation
+
+Automation of session opening and close-out may be introduced only
+after its behavior has been separately designed, reviewed, and
+approved.
+
+Automation must preserve:
+
+* Verification against live repository state.
+* Explicit handling of discrepancies.
+* Existing working-tree changes.
+* Explicit control over committed files.
+* Machine roles.
+* The two-document control model.
+
+Automation must support the workflow. It must not make project
+decisions silently.

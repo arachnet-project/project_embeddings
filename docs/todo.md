@@ -1,113 +1,165 @@
 # ARC_FILE: docs/todo.md
-# ============================================================
-# Arachnet Clinical Terminology Embeddings — Master Todo
-# Version: 1.4
-# Updated: 2026-06-01
-# ============================================================
-#
-# Revision policy: review and update at the start of every
-# working session and after every commit.
-# ============================================================
 
-## PHASE 0 — STEP 0.5 (db_connection.py) — IN PROGRESS
+# ACE — Todo
 
-- [x] database.yaml updated to v1.4 (Oracle usernames as keys)
-- [x] config_loader.py MANDATORY_KEYS updated
-- [x] conventions.md updated to v1.5
-- [x] _get_credentials implemented and tested (Round 1, 10/10 Ubuntu + OCI)
-- [x] get_connection implemented and tested (Round 2, 10/10 Ubuntu + OCI)
-- [x] open_connection implemented and tested (Round 3, 9/9 Ubuntu)
-- [x] test_connection implemented and tested (Round 4, 9/9 Ubuntu)
-- [x] execute_ddl implemented and tested (Round 5, 10/10 Ubuntu)
-- [x] execute_batch implemented (Round 6 written, not yet run)
-- [x] Run Round 6 tests (execute_batch) on Ubuntu + OCI
-- [x] execute_query implemented and tested (Round 7, 12/12 Ubuntu + OCI)
-- [x] get_pool stub implemented and tested (orchestrator inline)
-- [x] Write orchestrator tests/test_db_connection_py.py — passed Ubuntu + OCI
-- [ ] Write tests/protocols/test_db_connection_py.md
-- [ ] Run real DB tests on OCI (SNOMED_TEST_REAL_DB=true)
-- [ ] Formal closing commit: "feat: Step 0.5 complete"
+# Updated: 2026-08-29
 
-## PHASE 0 — STEP 0.6 (Bootstrap script)
+# Status: Transitional — permanent format not yet approved
 
-- [ ] Implement scripts/bootstrap.sh
-      Purpose: general prerequisite gate for all phases.
-      Checks: dirs, venv, env vars, Oracle reachable (test_connection),
-      prints environment summary. Exit 0 = safe to proceed.
-      Does NOT invoke pipeline scripts.
-- [ ] Write tests/test_bootstrap_sh.sh
-- [ ] Write tests/protocols/test_bootstrap_sh.md
-- [ ] Blocked on Step 0.5 completion
+## Current work unit
 
-## PHASE 0 — STEP 0.4 CLOSE
+### Development workflow
 
-- [ ] Resolve 26ai patch — waiting for Oracle support (Slavomír Seno)
-- [ ] Python 3.12 upgrade on Ubuntu — deferred, low priority
-- [ ] Fix SET VERIFY OFF in run_sql_setup.sh heredoc (passwords shown)
-- [ ] Formal closing commit for Step 0.4
+Status: `Approved`, `Applied`
 
-## INFRASTRUCTURE
+* `docs/dev_workflow.md` version 2.2 was reviewed and approved.
 
-- [ ] OCI security hardening:
-      - fail2ban installation and configuration
-      - cron audit — review all scheduled jobs
-      - log rotation verification
-      - unattended-upgrades for security patches
-- [ ] Add SNOMED release check cron job (Phase 1 concern)
-- [ ] Add LICENSE (BUSL 1.1) to repository
-- [ ] Resolve 26ai patch with Oracle support
-- [ ] ~/.bashrc on OCI and Mac — rename SNOMED_ADMIN_DB_PASSWORD
-      to SNOMED_SYS_DB_PASSWORD (Ubuntu done; verify OCI and Mac)
+* The stored Ubuntu file was verified against the approved text.
 
-## TOOLING (extract after Phase 0)
+* Whitespace verification passed.
 
-- [ ] Extract workflow aliases and functions to standalone Git repo
-      (separate from ACE — personal productivity infrastructure).
-      Current functions: xi, xo, xed, xcat, xclear, xcf, xcaf,
-      xcom, xpull, xbash, xpy, xrun, xsup, xsd, xdep, xmd
-      alias: ace
-      See docs/conventions.md workflow section for rationale.
-- [ ] Implement xmd in workflow repo (Markdown transformer):
-      strips line 1 path comment, passes to pandoc.
-      Pandoc: apt install pandoc / brew install pandoc.
-- [ ] Extract arc CLI to own Git repository after Phase 0
-- [ ] arc-clean command (clear outbox/inbox)
-- [ ] arc-commit command (git add/commit/push wrapper)
-- [ ] Shell detection fix in arc_setup.sh (bash vs zsh on Mac)
-- [ ] arc-init-relay (create transfer dirs on OCI via SSH)
-- [ ] Validation layer (check remote reachable before rsync)
-- [ ] Write arc documentation (README, howto)
+* The stored file has SHA-256:
 
-## DOCS
+  ```
+  bb753f1a7f58ddc15b2fafe2bcd4b59d60d8ff9b34bfe4c3a0c18a70a8bc3936
+  ```
 
-- [ ] Commit docs/road_map.md v1.2
-- [ ] Commit docs/phase0_foundation.md v1.7
-- [ ] Commit docs/snomed_vocabulary.md v0.4
-- [ ] Commit docs/conventions.md v1.5
-- [ ] Update docs/runbooks/run_sql_setup.md — verify reflects v1.3
-- [ ] Reconstruct docs/directory_structure.md if stale
-- [ ] docs/conventions.md — update Python version after 3.12 upgrade
+* Commit and push the workflow together with the updated project
+  summary and todo document during session close-out.
 
-## ACCESSIBILITY
+## Immediate next work
 
-- [ ] Ava American English Voxin voice on order — install when received
-- [ ] Investigate Orca crash in Vim at end of lines (Ubuntu)
-      — open in general project
-- [ ] Magic Keyboard Bluetooth pairing on Ubuntu:
-      bluetoothctl → pair → connect → trust
-- [ ] Ubuntu power cable replacement — arriving next week
+1. Inspect the Bash-script requirements in `docs/conventions.md`.
+2. Resolve any conflict between those requirements and Section 10 of
+   `docs/dev_workflow.md`.
+3. Inspect the existing planning and control files, including:
 
-## UZIS / EXTERNAL
+   * `wrk/session_plan.md`, if present;
+   * step-specific todo documents;
+   * `docs/project_memory.md`.
+4. Classify their contents as:
 
-- [ ] Await response from MUDr. Molinari re: development sample
-- [ ] Follow up on SNOMED International namespace registration
-- [ ] Confirm ModuleId (SCTID) for Czech extension
-- [ ] Get complete refset inventory from UZIS
+   * current work;
+   * backlog;
+   * unresolved decision;
+   * completed history;
+   * obsolete material.
+5. Design and approve the permanent `docs/todo.md` structure.
+6. Transfer all relevant unfinished material into `docs/todo.md`.
+7. Delete obsolete parallel project-control documents only after their
+   relevant contents have been preserved.
+8. Resume Step 0.6 bootstrap close-out.
 
-## PHASE 1 (future — after Phase 0 complete)
+## Current decisions
 
-- [ ] SQL table DDL files in sql/ddl/tables/
-- [ ] RF2 ingestion pipeline
-- [ ] Validation framework
-- [ ] Stage to production swap mechanism
-- [ ] SQLcl MCP Server setup for development QA
+* ACE uses exactly two project-control documents:
+
+  * `docs/project_summary.md`;
+  * `docs/todo.md`.
+* Both control documents remain tracked in Git.
+* Both must be updated, reviewed, committed, and pushed before a
+  substantial session is closed.
+* No separate decision log will be introduced.
+* Rejected and superseded items are recorded in `docs/todo.md`.
+* Material session outcomes are preserved in
+  `docs/project_summary.md`.
+* Broad documentation review is deferred to Step 0.7 unless a
+  document directly blocks current work.
+* Automation of session opening and close-out remains deferred until
+  it is separately designed, reviewed, and approved.
+
+## Step 0.6 bootstrap close-out
+
+Status: `Applied`, `Blocked` pending review and verification
+
+* [ ] Review and validate `config/required_modules.json`.
+* [ ] Strengthen validation in
+  `src/common/read_required_modules.py`.
+* [ ] Replace tests that modify repository configuration with isolated
+  fixtures.
+* [ ] Confirm the approved local bootstrap behavior.
+* [ ] Confirm the approved `--real-db` bootstrap interface.
+* [ ] Verify that neither bootstrap mode requires SYSDBA credentials.
+* [ ] Complete the concise environment summary.
+* [ ] Create the bootstrap verification protocol.
+* [ ] Run all required local bootstrap tests.
+* [ ] Run the applicable real-database verification on OCI.
+
+## Step 0.5 verification evidence
+
+Status: `Deferred`
+
+* [ ] Determine whether preserved evidence confirms execution with:
+
+  ```
+  SNOMED_TEST_REAL_DB=true
+  ```
+
+* [ ] Repeat the applicable real-Oracle verification during Phase 0
+  close-out if the evidence is insufficient.
+
+Step 0.5 implementation remains complete.
+
+## Step 0.7 integration and conformance audit
+
+Status: `Deferred`
+
+Begin only after Step 0.6 is complete.
+
+* [ ] Verify integration and conformance across the completed Phase 0
+  components.
+* [ ] Perform the broader documentation consistency review.
+* [ ] Review the directory-structure or document-index documentation.
+* [ ] Decide whether the repository requires a revised root
+  `README.md`.
+* [ ] Check cross-document terminology, scope, and stale references.
+* [ ] Verify the actual contents and intended use of
+  `sql/ddl/tables/`.
+* [ ] Resolve privileged Oracle credential-name inconsistencies.
+* [ ] Verify the actual OCI virtual-environment name and path.
+* [ ] Review `scripts/common/run.sh` and the corresponding
+  documentation claims.
+
+## Repository-maintenance backlog
+
+Status: `Deferred`
+
+The following older items require verification before they are applied
+or removed from the backlog:
+
+* [ ] Determine whether `scripts/bootstrap_v1.8.sh` still exists and
+  whether any relevant content remains.
+* [ ] Review `docs/claude_chat_howto.md` and confirm whether it should
+  be deleted.
+* [ ] Review the proposed move of `docs/patch_26ai.md` to
+  `docs/runbooks/patch_26ai.md`.
+* [ ] Check the singular `docs/runbook/` and plural
+  `docs/runbooks/` directories.
+* [ ] Remove the root `.pytest_cache/` and verify the applicable
+  `.gitignore` rule.
+* [ ] Remove unneeded `.DS_Store` files without staging unrelated
+  filesystem changes.
+* [ ] Decide whether `docs/project_memory.md` has any non-control
+  purpose. It must not become a third project-control document.
+* [ ] Review the proposed YAML migration of `check_env_vars`.
+* [ ] Consider the Python 3.12 upgrade on Ubuntu.
+
+## Contacts backlog
+
+Status: `Deferred`
+
+* [ ] Update `docs/contacts.md` with Jakub Horak’s role in the Oracle
+  26ai patch correspondence.
+* [ ] Add Viktor Nemec after his details are confirmed.
+
+## Open correspondence conflicts
+
+Status: `Blocked`
+
+* `docs/uzis_correspondence.md` version 1.1 contains a draft email to
+  MUDr. Molinari that was not sent. Her email address remains unknown.
+  Any statement that ACE is awaiting her response must be verified and
+  corrected if necessary.
+* The key requests recorded in `docs/uzis_meeting_prep.md` do not
+  appear to be answered in the available meeting notes. The possible
+  follow-up gap remains unresolved.
