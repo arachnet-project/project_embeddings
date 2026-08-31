@@ -80,113 +80,19 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Establish and apply the permanent structure of `docs/todo.md`, decide
-the proper non-control destination, if any, for legitimate material in
-`docs/project_memory.md`, and complete the approved removal or
-reclassification of parallel project-control documents without losing
-relevant material.
+Decide the proper non-control destination, if any, for legitimate
+architectural and communications material in
+`docs/project_memory.md`.
 
-After this control-document work is complete, resume Step 0.6
+After the project-memory disposition is resolved, resume Step 0.6
 bootstrap close-out.
 
-This focus is limited to control-document work required for compliance
-with `docs/dev_workflow.md`. The broader documentation consistency
-review remains deferred to Step 0.7.
+The broader documentation consistency review remains deferred to
+Step 0.7.
 
 ## 2. Active work units
 
-### 2.1 Permanent todo format
-
-Lifecycle status: `Applied`
-
-Owner: Jan
-
-Support: Current assistant
-
-Intended outcome:
-
-* Establish a permanent, concise, and accessible structure for
-  `docs/todo.md`.
-* Satisfy all requirements for `docs/todo.md` defined in
-  `docs/dev_workflow.md`.
-* Keep active work near the beginning.
-* Prevent completed history from making the document indefinitely
-  longer.
-* Avoid duplicating material that belongs in technical documentation,
-  `docs/project_summary.md`, or Git history.
-
-Approved next actions:
-
-1. Review the exact staged files and diff.
-2. Commit the two deletions with the approved todo replacement.
-3. Push the approved commit from Ubuntu.
-4. Verify alignment between Ubuntu `HEAD` and `origin/main`.
-5. On OCI, verify that the pull-only working tree is clean and on
-   `main`.
-6. Pull the updated `origin/main` on OCI using fast-forward-only
-   behavior.
-7. Verify that OCI is clean and aligned with `origin/main`.
-
-### 2.2 Obsolete parallel project-control documents
-
-Lifecycle status: `Applied`
-
-Owner: Jan
-
-Support: Current assistant
-
-Intended outcome:
-
-Remove obsolete parallel project-control documents after their
-relevant content has been preserved.
-
-Applied actions:
-
-* `docs/todo_step_0_4.md` was read and classified as an obsolete
-  parallel project-control document.
-* Its implementation and testing work is complete.
-* Its tests and test protocol exist.
-* It contains no unfinished material requiring transfer.
-* Its deletion is staged on Ubuntu.
-* `docs/todo_step_0_5.md` was read and classified as an obsolete
-  parallel project-control document.
-* Its continuing technical decisions are preserved in
-  `docs/phase0_foundation.md`.
-* Its unresolved real-Oracle evidence requirement is preserved in this
-  todo.
-* Its deletion is staged on Ubuntu.
-* The untracked `wrk/session_plan.md` was read and classified as an
-  obsolete parallel project-control document.
-* Its remaining repository-maintenance item was verified as obsolete
-  because `scripts/bootstrap_v1.8.sh` no longer exists.
-* `wrk/session_plan.md` was removed from Ubuntu after a temporary
-  backup was created at:
-
-  ```
-  /tmp/ace_session_plan_2026-08-29.md
-  ```
-
-Current staged deletions:
-
-```text
-docs/todo_step_0_4.md
-docs/todo_step_0_5.md
-```
-
-Approved next actions:
-
-1. Stage this approved todo.
-2. Review the exact staged files and diff.
-3. Commit the two deletions with the approved todo replacement.
-4. Push the approved commit from Ubuntu.
-5. Verify alignment between Ubuntu `HEAD` and `origin/main`.
-6. On OCI, verify that the pull-only working tree is clean and on
-   `main`.
-7. Pull the updated `origin/main` on OCI using fast-forward-only
-   behavior.
-8. Verify that OCI is clean and aligned with `origin/main`.
-
-### 2.3 Project-memory disposition
+### 2.1 Project-memory disposition
 
 Lifecycle status: `Agreed`
 
@@ -266,12 +172,9 @@ Owner: Jan
 Owner: Jan
 
 * `docs/dev_workflow.md` version 2.2 is approved.
-* The workflow and the two control documents reached lifecycle status
-  `Pushed` in commit:
-
-  ```
-  8bcc4cb97666883bcaf1888407f2e40dd618a341
-  ```
+* Ubuntu is the primary development and sole push machine.
+* OCI Frankfurt and macOS remain pull-only.
+* The live repository remains the primary verifiable source of truth.
 
 ### 3.3 Bash requirements
 
@@ -320,58 +223,9 @@ Owner: Jan
   SYSDBA credentials.
 * The approved Phase 1 setup procedure determines privileged access.
 
-## 4. Material plan changes
+## 4. Current implementation work
 
-### 4.1 Control-document restructuring order
-
-Lifecycle status: `Agreed`
-
-Owner: Jan
-
-Support: Current assistant
-
-The transitional todo placed inspection of existing planning files
-before design of the permanent todo format.
-
-The approved order is now:
-
-1. Resolve the Bash-conventions question.
-2. Design and approve the permanent `docs/todo.md` structure.
-3. Inspect existing parallel planning and control files as required.
-4. Transfer relevant unfinished material.
-5. Delete obsolete parallel project-control documents only after
-   preservation and explicit approval.
-6. Resume Step 0.6 bootstrap close-out.
-
-Reason:
-
-`docs/todo.md` must provide an approved destination and classification
-structure for relevant material transferred from obsolete documents.
-
-### 4.2 Group 1 investigation scope
-
-Lifecycle status: `Applied`
-
-Owner: Jan
-
-Support: Current assistant
-
-The Group 1 investigation initially became broader and slower than
-necessary.
-
-For the remaining control-document review:
-
-* Resolve files once sufficient evidence exists.
-* Do not investigate historical detail that cannot materially change
-  preservation, classification, or deletion.
-* Inspect additional documents only when they can affect preservation,
-  classification, or deletion.
-* Complete the current logical work unit before opening a broader
-  investigation.
-
-## 5. Current implementation work
-
-### 5.1 Step 0.6 bootstrap close-out
+### 4.1 Step 0.6 bootstrap close-out
 
 Lifecycle status: `Applied`
 
@@ -383,8 +237,8 @@ Support: Current assistant
 
 Reason for deferral:
 
-Step 0.6 could proceed, but it is deliberately postponed while the
-required control-document restructuring is completed.
+Step 0.6 could proceed, but it remains deliberately postponed until
+the project-memory disposition is resolved.
 
 Current preserved working-tree files:
 
@@ -464,7 +318,7 @@ Required work:
 
 * [ ] Run the applicable real-database verification on OCI.
 
-### 5.2 Step 0.5 verification evidence
+### 4.2 Step 0.5 verification evidence
 
 Lifecycle status: `Deferred`
 
@@ -487,9 +341,9 @@ Required evidence review:
 
 Repeating this verification does not reopen Step 0.5 implementation.
 
-## 6. Blockers and unresolved questions
+## 5. Blockers and unresolved questions
 
-### 6.1 OCI virtual environment
+### 5.1 OCI virtual environment
 
 Lifecycle status: `Agreed`
 
@@ -515,7 +369,7 @@ Required action:
 * [ ] Verify the actual OCI virtual-environment name and path before
   changing configuration or documentation.
 
-### 6.2 UZIS correspondence
+### 5.2 UZIS correspondence
 
 Lifecycle status: `Agreed`
 
@@ -532,9 +386,9 @@ Owner: Jan
   answered in the available meeting notes.
 * The possible follow-up gap remains unresolved.
 
-## 7. Deferred work and backlog
+## 6. Deferred work and backlog
 
-### 7.1 Step 0.7 integration and conformance audit
+### 6.1 Step 0.7 integration and conformance audit
 
 Lifecycle status: `Deferred`
 
@@ -561,7 +415,7 @@ Begin only after Step 0.6 is complete.
 * [ ] Check `docs/git_workflow.md` against the closed commit-prefix set
   in `docs/dev_workflow.md`.
 
-### 7.2 Repository maintenance
+### 6.2 Repository maintenance
 
 Lifecycle status: `Deferred`
 
@@ -583,7 +437,7 @@ removed:
   filesystem changes.
 * [ ] Review the proposed YAML migration of `check_env_vars`.
 
-### 7.3 Environment maintenance
+### 6.3 Environment maintenance
 
 Lifecycle status: `Deferred`
 
@@ -616,7 +470,7 @@ Support: Current assistant
 
 * [ ] Record any continuing dependency on Oracle Support.
 
-### 7.4 Contacts
+### 6.4 Contacts
 
 Lifecycle status: `Deferred`
 
@@ -630,7 +484,7 @@ Support: Current assistant
   and add their contact details to `docs/contacts.md` once
   confirmed.
 
-### 7.5 Claude Code evaluation
+### 6.5 Claude Code evaluation
 
 Lifecycle status: `Deferred`
 
@@ -649,9 +503,34 @@ Begin after Phase 0 is complete.
 * [ ] Revise `docs/dev_workflow.md` explicitly before Claude Code
   becomes part of the approved ACE workflow.
 
-## 8. Rejected and superseded items
+### 6.6 dev_workflow.md revision — explicit prefix statement
 
-### 8.1 Separate decision log
+Lifecycle status: `Agreed`
+
+Owner: Jan
+
+Support: Current assistant
+
+Add an explicit step to `dev_workflow.md` §7 requiring the assistant to
+state which approved commit-message prefix applies and why, before
+presenting any commit message. This applies as a general rule to any
+LLM acting as "Current assistant," not to a specific model.
+
+This is a revision to an `Approved` document and requires its own
+review-and-approval cycle per `dev_workflow.md` §12, not a same-session
+fold-in.
+
+Approved next actions:
+
+1. Draft the specific wording as a new step in §7's "Before committing"
+   list.
+2. Review and approve the revision.
+3. Bump `docs/dev_workflow.md` to the next version.
+4. Commit and push the revised workflow document.
+
+## 7. Rejected and superseded items
+
+### 7.1 Separate decision log
 
 Outcome: `Rejected`
 
@@ -662,17 +541,17 @@ Owner: Jan
 * Material outcomes are transferred to `docs/project_summary.md`
   during session close-out.
 
-### 8.2 Previous control-document restructuring order
+### 7.2 Previous control-document restructuring order
 
 Outcome: `Superseded`
 
 Owner: Jan
 
 The plan to inspect and classify all parallel control files before
-designing the permanent todo structure was replaced by the order in
-Section 4.1.
+designing the permanent todo structure was replaced by the approved
+todo-format-first approach.
 
-### 8.3 Separate session-plan control document
+### 7.3 Separate session-plan control document
 
 Outcome: `Superseded`
 
