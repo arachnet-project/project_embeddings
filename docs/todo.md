@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.0
+# Version: 2.1
 
-# Updated: 2026-08-30
+# Updated: 2026-09-02
 
 # Status: Approved
 
@@ -39,7 +39,7 @@ The current focus is the highest-priority outcome guiding the order of
 active work.
 
 It is not a project objective, phase exit criterion, or record of
-completed work. It must be updated when the project’s immediate
+completed work. It must be updated when the project's immediate
 priority changes.
 
 ### Work unit
@@ -80,19 +80,15 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Decide the proper non-control destination, if any, for legitimate
-architectural and communications material in
-`docs/project_memory.md`.
-
-After the project-memory disposition is resolved, resume Step 0.6
-bootstrap close-out.
-
-The broader documentation consistency review remains deferred to
-Step 0.7.
+Apply the reviewed Step 0.6 revisions (`scripts/bootstrap.sh`,
+`src/common/read_required_modules.py`,
+`src/common/read_required_dirs.py`) to the working tree, update the
+affected test files, run all required local and OCI verification, then
+commit.
 
 ## 2. Active work units
 
-### 2.1 Project-memory disposition
+### 2.1 Apply and test reviewed Step 0.6 revisions
 
 Lifecycle status: `Agreed`
 
@@ -100,52 +96,47 @@ Owner: Jan
 
 Support: Current assistant
 
-Intended outcome:
+Reviewed content, not yet applied to the working tree:
 
-Preserve any legitimate architectural or communications material from
-`docs/project_memory.md` without retaining a model-specific parallel
-project-control document.
-
-Current state:
-
-* `docs/project_memory.md` is preserved and untracked on Ubuntu.
-* It identifies itself as a “GPT track.”
-* It records decisions, designs, discussions, drafts, and conclusions.
-* Its current purpose conflicts with the approved two-document
-  project-control model.
-* It must not become a third project-control document.
-* It must not remain dependent on GPT, Claude, or another particular
-  model.
-
-Material requiring disposition:
-
-* The four-layer conceptual model:
-
-  * Source of Truth.
-  * Rulebook.
-  * Learning Engine.
-  * Search and Reasoning.
-* The acute-appendicitis conceptual walkthrough.
-* Attribute-propagation concepts.
-* Governance and explainability principles.
-* Intellectual-property disclosure guidance.
-* LinkedIn-post material.
+* `scripts/bootstrap.sh` (drafted as v1.9) — removes the
+  `TNS_ADMIN`-triggered `SNOMED_SYS_DB_PASSWORD` requirement (conflicts
+  with the approved Phase 0/1 Oracle boundary, §3.5); fixes a shell
+  code-injection vector in `check_python_modules` by passing the
+  module name as `sys.argv[1]` and importing via `importlib` instead
+  of interpolating into `-c` source; distinguishes `MISSING` from
+  `IMPORT FAILED`; hardens directory-path validation (exact `..`
+  component check, post-creation symlink-escape check against
+  `PROJECT_ROOT`); uses `${PYTHON}` consistently instead of bare
+  `python3`; adds `EXIT`-trap temp-file cleanup; adds the required
+  environment summary.
+* `src/common/read_required_modules.py` (drafted as v2.0) — adds
+  `--config PATH` for test isolation; validates `import_name` as a
+  valid dotted Python identifier (closes the injection surface at the
+  data source); rejects non-string, empty, whitespace-padded, or
+  comma/newline-containing values; rejects duplicate `import_name`;
+  separates load/validate/print for independent testability; validates
+  the complete registry before printing any entry.
+* `src/common/read_required_dirs.py` (drafted as v2.0) — adds
+  `--config PATH`; validates each entry as a safe relative path (no
+  leading `/`, no `..`/`.`/empty component, checked on the literal
+  string rather than via `PurePosixPath`, which silently normalizes
+  away the components being checked for); rejects ASCII control
+  characters (including NUL, which bash command substitution silently
+  drops) and DEL; rejects duplicates; separates load/validate/print.
 
 Approved next actions:
 
-1. Inspect `docs/infrastructure.md` only to determine whether its scope
-   overlaps with the four-layer model.
-2. Decide whether the theoretical material belongs in:
-
-   * a legitimate ACE architecture document;
-   * ANTHEA;
-   * communications or outreach documentation;
-   * or no continuing project document.
-3. Decide whether the LinkedIn material requires preservation.
-4. Transfer only material with an approved continuing purpose.
-5. Delete or explicitly repurpose `docs/project_memory.md` after
-   preservation is complete.
-6. Ensure that any resulting document has a clear non-control purpose.
+1. Apply the three reviewed files to the working tree on Ubuntu.
+2. Update `tests/test_bootstrap_r3_sh.sh` and any other affected test
+   file to match the new interfaces: `--config` flag, `IMPORT FAILED`
+   vs `MISSING` distinction, removal of the `TNS_ADMIN`/SYS-password
+   check.
+3. Run all required local bootstrap tests.
+4. Run OCI verification.
+5. Review the diff, confirm commit-message prefix (`feat:` or `fix:`,
+   not `docs:` — this is a functional and security-relevant code
+   change).
+6. Commit and push.
 
 ## 3. Decisions in force
 
@@ -188,7 +179,7 @@ Support: Current assistant
   `docs/conventions.md` have no substantive conflict.
 * For a managed repository Bash file, the mandatory `ARC_FILE:` marker
   remains on line 1.
-* The requirement to place `set -euo pipefail` “at the top” means
+* The requirement to place `set -euo pipefail` "at the top" means
   before operational commands. It does not prohibit the required
   `ARC_FILE:` marker or introductory comments.
 * A temporary script presented in conversation is not a managed
@@ -222,128 +213,37 @@ Owner: Jan
 * Neither local nor real-database bootstrap may use `sys` or require
   SYSDBA credentials.
 * The approved Phase 1 setup procedure determines privileged access.
+* This boundary was actively violated by the inherited
+  `scripts/bootstrap.sh`'s `TNS_ADMIN`-triggered
+  `SNOMED_SYS_DB_PASSWORD` check; the reviewed revision (§2.1) removes
+  it.
 
-## 4. Current implementation work
+## 4. Blockers and unresolved questions
 
-### 4.1 Step 0.6 bootstrap close-out
+### 4.1 `--real-db` mode design
 
-Lifecycle status: `Applied`
+Lifecycle status: `Agreed`
 
-Status modifier: `Deferred`
-
-Owner: Jan
-
-Support: Current assistant
-
-Reason for deferral:
-
-Step 0.6 could proceed, but it remains deliberately postponed until
-the project-memory disposition is resolved.
-
-Current preserved working-tree files:
-
-* `scripts/bootstrap.sh`
-* `tests/test_bootstrap_r3_sh.sh`
-* `config/required_modules.json`
-* `src/common/read_required_modules.py`
-
-Existing test evidence:
-
-Earlier records report that the five existing bootstrap test files
-passed on Ubuntu and OCI.
-
-Those results remain historical evidence for the versions tested, but
-they do not verify the current working tree. Changes to
-`scripts/bootstrap.sh` and `tests/test_bootstrap_r3_sh.sh`, together
-with the new dependency registry and helper, require current local and
-OCI verification after the Step 0.6 implementation and isolated
-fixtures are finalized.
-
-Required work:
-
-* [ ] Review and validate `config/required_modules.json`.
-
-* [ ] Strengthen validation in
-  `src/common/read_required_modules.py`.
-
-* [ ] Replace tests that modify repository configuration with isolated
-  fixtures.
-
-* [ ] Confirm that default bootstrap reports missing or broken
-  prerequisites without requiring those prerequisites to operate
-  successfully.
-
-* [ ] Verify that dependency failures identify the actual failing
-  prerequisite.
-
-* [ ] Verify that diagnostics do not expose credentials.
-
-* [ ] Confirm the approved local bootstrap behavior.
-
-* [ ] Verify that local mode does not require Oracle connectivity,
-  application schemas, application-schema passwords, or SYSDBA
-  credentials.
-
-* [ ] Verify that any directory creation is restricted to explicitly
-  approved runtime directories.
-
-* [ ] Confirm the approved `--real-db` interface.
-
-* [ ] Verify that `--real-db` uses the approved database-connection
-  interface to test Oracle reachability.
-
-* [ ] Verify that `--real-db` checks both:
-
-  ```
-  snomed
-  snomed_stage
-  ```
-
-* [ ] Verify that an unavailable or unprovisioned application schema
-  causes a safe failure with an accurate diagnostic.
-
-* [ ] Verify that `--real-db` explains that Phase 1 setup must precede
-  verification when application schemas do not exist.
-
-* [ ] Verify that real-database mode does not create or modify Oracle
-  objects.
-
-* [ ] Verify that neither bootstrap mode requires SYSDBA credentials.
-
-* [ ] Complete the concise environment summary.
-
-* [ ] Create the bootstrap verification protocol.
-
-* [ ] Run all required local bootstrap tests.
-
-* [ ] Run the applicable real-database verification on OCI.
-
-### 4.2 Step 0.5 verification evidence
-
-Lifecycle status: `Deferred`
+Status modifier: `Blocked`
 
 Owner: Jan
 
 Support: Current assistant
 
-Step 0.5 implementation remains complete.
+`--real-db` remains unimplemented in `scripts/bootstrap.sh`. Design
+requires reviewing the approved `db_connection.py` interface first —
+not done this session.
 
-Required evidence review:
+Required action:
 
-* [ ] Determine whether preserved evidence confirms execution with:
+* [ ] Review `db_connection.py`'s approved interface for Oracle
+  reachability checks.
+* [ ] Design `--real-db`'s check of both `snomed` and `snomed_stage`
+  schemas, safe handling of unprovisioned schemas, and confirmation
+  that no Oracle objects are modified — without requiring SYS/SYSDBA
+  credentials, per §3.5.
 
-  ```
-  SNOMED_TEST_REAL_DB=true
-  ```
-
-* [ ] Repeat the applicable real-Oracle verification during Phase 0
-  close-out if the evidence is insufficient.
-
-Repeating this verification does not reopen Step 0.5 implementation.
-
-## 5. Blockers and unresolved questions
-
-### 5.1 OCI virtual environment
+### 4.2 OCI virtual environment
 
 Lifecycle status: `Agreed`
 
@@ -369,7 +269,7 @@ Required action:
 * [ ] Verify the actual OCI virtual-environment name and path before
   changing configuration or documentation.
 
-### 5.2 UZIS correspondence
+### 4.3 UZIS correspondence
 
 Lifecycle status: `Agreed`
 
@@ -386,11 +286,38 @@ Owner: Jan
   answered in the available meeting notes.
 * The possible follow-up gap remains unresolved.
 
+## 5. Step 0.5 verification evidence
+
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
+
+Owner: Jan
+
+Support: Current assistant
+
+Step 0.5 implementation remains complete.
+
+Required evidence review:
+
+* [ ] Determine whether preserved evidence confirms execution with:
+
+  ```
+  SNOMED_TEST_REAL_DB=true
+  ```
+
+* [ ] Repeat the applicable real-Oracle verification during Phase 0
+  close-out if the evidence is insufficient.
+
+Repeating this verification does not reopen Step 0.5 implementation.
+
 ## 6. Deferred work and backlog
 
 ### 6.1 Step 0.7 integration and conformance audit
 
-Lifecycle status: `Deferred`
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
 
 Owner: Jan
 
@@ -407,7 +334,10 @@ Begin only after Step 0.6 is complete.
 * [ ] Check cross-document terminology, scope, and stale references.
 * [ ] Verify the actual contents and intended use of
   `sql/ddl/tables/`.
-* [ ] Resolve privileged Oracle credential-name inconsistencies.
+* [ ] Resolve privileged Oracle credential-name inconsistencies (note:
+  `docs/infrastructure.md` §5 uses `SNOMED_ADMIN_DB_PASSWORD`; the
+  now-removed bootstrap check used `SNOMED_SYS_DB_PASSWORD` — these
+  never matched).
 * [ ] Review `scripts/common/run.sh` and corresponding documentation
   claims.
 * [ ] Correct the inconsistent Python file-header example in
@@ -417,7 +347,9 @@ Begin only after Step 0.6 is complete.
 
 ### 6.2 Repository maintenance
 
-Lifecycle status: `Deferred`
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
 
 Owner: Jan
 
@@ -435,11 +367,15 @@ removed:
   `.gitignore` rule.
 * [ ] Remove unneeded `.DS_Store` files without staging unrelated
   filesystem changes.
-* [ ] Review the proposed YAML migration of `check_env_vars`.
+* [ ] Review the proposed YAML migration of `check_env_vars` (moving
+  the hardcoded bash array to a YAML config, mirroring
+  `check_required_dirs`).
 
 ### 6.3 Environment maintenance
 
-Lifecycle status: `Deferred`
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
 
 Owner: Jan
 
@@ -472,21 +408,26 @@ Support: Current assistant
 
 ### 6.4 Contacts
 
-Lifecycle status: `Deferred`
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
 
 Owner: Jan
 
 Support: Current assistant
 
-* Viktor Němec remains recorded in `docs/contacts.md` as Jan’s
+* Viktor Němec remains recorded in `docs/contacts.md` as Jan's
   original Oracle contact. No change is required.
-* [ ] Identify the new person responsible for Jan’s OCI environment
+* [ ] Remove Jakub Horák from the contacts plan.
+* [ ] Identify the new person responsible for Jan's OCI environment
   and add their contact details to `docs/contacts.md` once
   confirmed.
 
 ### 6.5 Claude Code evaluation
 
-Lifecycle status: `Deferred`
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
 
 Owner: Jan
 
@@ -517,8 +458,8 @@ presenting any commit message. This applies as a general rule to any
 LLM acting as "Current assistant," not to a specific model.
 
 This is a revision to an `Approved` document and requires its own
-review-and-approval cycle per `dev_workflow.md` §12, not a same-session
-fold-in.
+review-and-approval cycle per `dev_workflow.md`'s explicit revision
+requirements (§§3, 7, 9), not a same-session fold-in.
 
 Approved next actions:
 
@@ -527,6 +468,29 @@ Approved next actions:
 2. Review and approve the revision.
 3. Bump `docs/dev_workflow.md` to the next version.
 4. Commit and push the revised workflow document.
+
+### 6.7 ANTHEA transfer of ace_architecture.md
+
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
+
+Owner: Jan
+
+Support: Current assistant
+
+`docs/ace_architecture.md` is committed to ACE temporarily. Jan has
+stated that after `v0.1.0-phase0` is tagged, it should be transferred
+into the ANTHEA repository and then removed from ACE. ANTHEA's own
+repository status is not yet confirmed; this is revisited when ANTHEA
+work resumes after Phase 0.
+
+Required action:
+
+* [ ] After `v0.1.0-phase0` is tagged, commit `docs/ace_architecture.md`
+  into the ANTHEA repository (once confirmed reachable).
+* [ ] Remove `docs/ace_architecture.md` from the ACE repository once
+  the ANTHEA transfer is confirmed.
 
 ## 7. Rejected and superseded items
 

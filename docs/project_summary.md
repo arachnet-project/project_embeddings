@@ -2,9 +2,9 @@
 
 # ACE — Project Summary
 
-**Updated:** 2026-08-30
-**Session closed:** Pending final close-out commit
-**Prepared by:** GPT, pending review by Jan Mura
+**Updated:** 2026-09-02
+**Session closed:** 2026-09-02
+**Prepared by:** Claude, reviewed by Jan Mura
 **Current phase:** Phase 0 — Foundation and Infrastructure
 **Phase status:** In progress
 
@@ -42,7 +42,7 @@ Frankfurt and macOS remained pull-only.
 At session start, local `HEAD` and `origin/main` were aligned at:
 
 ```text
-8bcc4cb97666883bcaf1888407f2e40dd618a341
+51a912e
 ```
 
 The preserved working tree contained:
@@ -59,253 +59,162 @@ The preserved working tree contained:
 
 ### Session opening and repository verification
 
-The approved `docs/dev_workflow.md` version 2.2 and the inherited
-project summary were read.
+`docs/dev_workflow.md` v2.2 was read. The inherited
+`docs/project_summary.md` was read and a material discrepancy was
+identified: it described a "Prepared by: GPT, pending review by Jan
+Mura" state and a different Git history than the live repository. Live
+`git status`/`git log` output was used to resolve the discrepancy: the
+correct `HEAD` was `51a912e`, and the pasted `project_summary.md` and
+`docs/todo.md` were confirmed as its actual committed content.
 
-The live Ubuntu repository was verified as:
+### Project-memory disposition (`docs/todo.md` former §2.1)
 
-```text
-/home/jan/project_embeddings
-branch: main
-```
+`docs/infrastructure.md` was inspected and confirmed to have no scope
+overlap with the theoretical material in `docs/project_memory.md`.
 
-`HEAD` and `origin/main` were aligned at the inherited commit.
+`docs/project_memory.md` was read in full and reviewed with Jan. The
+following disposition was agreed and applied:
 
-The complete transitional `docs/todo.md` and
-`docs/conventions.md` were reviewed.
+* The four-layer conceptual model, the acute-appendicitis walkthrough,
+  and the attribute-propagation discussion were preserved in a new
+  file, `docs/ace_architecture.md`.
+* The LinkedIn post drafts and intellectual-property disclosure
+  discussion were reviewed and discarded — no continuing
+  organizational or ANTHEA value was identified.
+* The bootstrap-script discussion (referencing `bootstrap.sh` v1.2,
+  `read_required_dirs.py`, `directory_structure.yaml`) was reviewed
+  and discarded as superseded by the current Step 0.6 implementation.
+* `docs/project_memory.md` was deleted (untracked; plain `rm`).
 
-### Bash-conventions review
+`docs/ace_architecture.md` is intended for eventual transfer into the
+ANTHEA repository after `v0.1.0-phase0` is tagged, per Jan's
+instruction. It is committed to ACE temporarily in the meantime.
 
-Section 10 of `docs/dev_workflow.md` was compared with the Bash
-requirements in `docs/conventions.md`.
+### Corrections to the todo/workflow-process documents
 
-No substantive conflict was found.
+Jan reviewed a draft revision of `docs/todo.md` and raised eight
+objections (through a GPT review pass). All eight were addressed:
 
-The approved interpretation is:
+1. Current-focus wording was corrected to not prematurely claim Step
+   0.6 was resumed before the project-memory work was committed.
+2. A new corrective work unit was added recording the stale
+   `Prepared by`/`Session closed` wording left in the previous
+   `docs/project_summary.md` by commit `51a912e`.
+3. `Lifecycle status: Deferred` was corrected to
+   `Lifecycle status: Agreed` with `Status modifier: Deferred` across
+   six sections that had misused `Deferred` as a lifecycle state,
+   contrary to `dev_workflow.md` §5.
+4. The claim that `docs/ace_architecture.md` and the `project_memory.md`
+   deletion were already applied was corrected to reflect they were
+   only agreed at that point — corrected once the actions were
+   actually verified via `git status`.
+5. Vague "non-project-control content" wording for discarded material
+   was replaced with a specific account of what was discarded and why.
+6. An incorrect citation of `dev_workflow.md` §12 (automation) was
+   corrected to reference the workflow's actual revision requirements
+   (§§3, 7, 9).
+7. The document's `Updated` date was corrected to the actual session
+   date.
+8. The ANTHEA-transfer decision was confirmed as Jan's explicit
+   instruction, not an assistant-originated proposal, and the
+   temporary-ACE-commit approach was confirmed as intentional given
+   ANTHEA's repository status is not yet confirmed.
 
-* A managed repository Bash file retains the mandatory `ARC_FILE:`
-  marker on line 1.
-* `set -euo pipefail` appears before operational commands.
-* Required introductory comments may precede it.
-* Temporary conversational scripts are not managed repository files
-  and do not require an `ARC_FILE:` marker.
-* No conventions change is required for this issue.
+### Step 0.6 bootstrap — reviewed and revised (not yet applied)
 
-The inconsistent Python file-header example remains deferred to
-Step 0.7.
+`config/required_modules.json`, `src/common/read_required_modules.py`,
+`scripts/bootstrap.sh`, `config/directory_structure.yaml`, and
+`src/common/read_required_dirs.py` were read and reviewed in detail,
+including two rounds of review (via GPT) surfacing 6 objections on the
+modules helper and 8 objections on `bootstrap.sh` and the directory
+helper.
 
-### Permanent todo format
+Revised versions were drafted addressing all raised objections,
+including:
 
-A permanent structure for `docs/todo.md` version 2.0 was designed,
-reviewed, and approved.
+* A real code-injection vector in `check_python_modules`
+  (`"${PYTHON}" -c "import ${module}"` with unsafe shell interpolation
+  of registry-sourced data) was identified and fixed by passing the
+  module name as `sys.argv[1]` and importing via `importlib`.
+* A conflict between `check_env_vars`'s `TNS_ADMIN`-triggered
+  `SNOMED_SYS_DB_PASSWORD` requirement and the approved Phase 0/1
+  Oracle boundary (`docs/todo.md` §3.5 — no SYS/SYSDBA credentials in
+  either bootstrap mode) was identified and the offending block
+  removed.
+* `MISSING` vs `IMPORT FAILED` reporting was distinguished so genuine
+  absence is not conflated with a broken installation.
+* Directory-path validation was hardened: exact `..` component
+  checking (replacing an overbroad substring check) plus a
+  post-creation symlink-escape check against `PROJECT_ROOT`.
+* `read_required_dirs.py`'s path-safety check was found to have a real
+  defect during review — `PurePosixPath` silently normalizes away the
+  empty/`.` components the check claimed to reject — and was corrected
+  to split on the literal string instead.
+* A concise environment summary (project root, venv, Python version,
+  mode, check results) was added, addressing the missing requirement
+  in `docs/todo.md` §4.1.
+* Temp-file cleanup was made robust via an `EXIT` trap.
 
-The approved format:
+**These revisions exist only as reviewed drafts in this session. They
+have not been written to the working tree, and no test has been run
+against them.** `docs/todo.md` records this as the explicit next step.
 
-* Keeps current focus and active work near the beginning.
-* Defines work units, owners, support, inherited responsibility, and
-  approved next actions.
-* Uses model-independent `Current assistant` responsibility.
-* Separates decisions, implementation work, blockers, deferred work,
-  backlog, and rejected or superseded items.
-* Removes completed work after its material outcome has been preserved
-  in the project summary.
-* Condenses old detail when an applicable technical document or Git
-  history preserves it.
+Two items were explicitly identified as out of scope for this pass and
+deferred:
 
-### Obsolete project-control documents
-
-The following files were read and classified:
-
-```text
-docs/todo_step_0_4.md
-docs/todo_step_0_5.md
-wrk/session_plan.md
-docs/project_memory.md
-```
-
-`docs/todo_step_0_4.md` contained completed Step 0.4 history and no
-unfinished material requiring transfer.
-
-`docs/todo_step_0_5.md` contained completed Step 0.5 history, stale
-checklist entries, and technical decisions now preserved in
-`docs/phase0_foundation.md`.
-
-The unresolved Step 0.5 real-Oracle evidence requirement was preserved
-in `docs/todo.md`.
-
-The untracked and ignored `wrk/session_plan.md` was obsolete. It was
-removed from Ubuntu after a temporary backup was created at:
-
-```text
-/tmp/ace_session_plan_2026-08-29.md
-```
-
-Its remaining bootstrap-duplicate reminder was resolved because:
-
-```text
-scripts/bootstrap_v1.8.sh
-```
-
-no longer exists.
-
-The two tracked step-specific todo files were deleted in:
-
-```text
-437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-docs: Remove obsolete project-control files
-```
-
-### Project-memory classification
-
-`docs/project_memory.md` remains preserved and untracked.
-
-Its present model-specific project-memory purpose is incompatible with
-the approved two-document control model.
-
-It contains potentially legitimate theoretical, architectural, and
-communications material that must be classified before the file is
-deleted or repurposed.
-
-No replacement document may operate as a third project-control
-document or depend on a particular AI model.
-
-### Bootstrap planning
-
-Step 0.6 remains applied but deferred until the current
-control-document work is resolved.
-
-The todo now distinguishes earlier historical bootstrap test results
-from verification of the current working tree.
-
-It explicitly preserves the remaining requirements for:
-
-* Dependency-registry validation.
-* Stronger helper validation.
-* Isolated test fixtures.
-* Accurate prerequisite diagnostics.
-* Credential-safe failures.
-* Approved runtime-directory creation only.
-* Local operation without Oracle.
-* Oracle reachability in `--real-db` mode.
-* Verification of both application schemas.
-* Safe handling of unprovisioned schemas.
-* No Oracle-object modification.
-* No SYSDBA requirement.
-* Environment-summary completion.
-* Local and OCI verification.
-
-### Additional deferred work
-
-The todo records:
-
-* Ubuntu Python 3.12 evaluation.
-* Verification and resolution of the OCI Oracle Database 26ai update
-  or patch state.
-* Identification of the new person responsible for Jan’s OCI
-  environment.
-* Claude Code evaluation after Phase 0.
-* Repository-maintenance and Step 0.7 documentation work.
-
-Jakub Horák was removed from the contacts plan because he no longer
-holds the relevant role.
-
-Viktor Němec remains Jan’s original Oracle contact.
+* `--real-db` mode remains unimplemented; it requires reviewing the
+  approved `db_connection.py` interface first, which was not done this
+  session.
+* Confirming that `read_required_dirs.py`'s returned list is
+  specifically the approved runtime-directory set was completed
+  (`config/directory_structure.yaml` was reviewed: `log`, `wrk`,
+  `tests/results`, `sql/ddl/tables` — confirmed as the approved set).
 
 ## Decisions approved this session
 
-* `docs/todo.md` version 2.0 is approved as the permanent todo format.
-* Active work remains near the beginning of the todo.
-* Completed work is removed from the todo after its material outcome
-  is preserved in the project summary.
-* Every work unit has an owner.
-* Support is recorded where useful.
-* `Current assistant` is functional and model-independent.
-* Step 0.6 is `Applied` with modifier `Deferred`, not `Blocked`.
-* Earlier bootstrap test results do not verify the current working
-  tree.
-* The current bootstrap changes require new local and OCI verification.
-* `docs/todo_step_0_4.md` is obsolete and deleted.
-* `docs/todo_step_0_5.md` is obsolete and deleted.
-* `wrk/session_plan.md` is obsolete and removed.
-* `docs/project_memory.md` remains preserved pending content
-  disposition.
-* Broad documentation work remains deferred to Step 0.7 unless it
-  directly blocks current work.
-* Claude Code integration is deferred until after Phase 0.
-* Claude Code must not become part of the approved ACE workflow without
-  an explicit workflow revision.
-* The singular `docs/runbook/` path remains obsolete.
-* A possible runbook location uses plural `docs/runbooks/`.
+* `docs/ace_architecture.md` is the approved destination for the
+  four-layer model material, pending ANTHEA transfer after
+  `v0.1.0-phase0`.
+* Remaining `docs/project_memory.md` material has no continuing value
+  and required no further preservation.
+* The stale `project_summary.md` wording from `51a912e` is a recorded,
+  deferred corrective item, resolved by this document's own rewrite.
+* `Deferred` is a status modifier, never a lifecycle status, per
+  `dev_workflow.md` §5; six todo sections were corrected accordingly.
+* The revised bootstrap/helper code is reviewed and agreed in design,
+  but must be applied to the working tree and tested before it may be
+  committed. It is not committed this session.
+* Given session length, this session is being closed now rather than
+  continuing further code review, to keep close-out state clean for
+  the next session.
 
 ## Verification performed
 
-### Ubuntu
+The project-memory disposition was verified via live `git status` and
+staged `git diff` output (files: `docs/ace_architecture.md` added,
+`docs/todo.md` modified; `scripts/bootstrap.sh`,
+`tests/test_bootstrap_r3_sh.sh`, `config/required_modules.json`, and
+`src/common/read_required_modules.py` correctly excluded from staging).
 
-Before the cleanup commit:
+The bootstrap/helper revisions were reviewed for correctness in
+conversation but have not been executed or tested. This is not
+`Tested` evidence and must not be treated as such.
 
-```text
-HEAD:        8bcc4cb97666883bcaf1888407f2e40dd618a341
-origin/main: 8bcc4cb97666883bcaf1888407f2e40dd618a341
-behind/ahead: 0 0
-```
+## Repository state at session close
 
-The cleanup commit contained exactly:
-
-```text
-M  docs/todo.md
-D  docs/todo_step_0_4.md
-D  docs/todo_step_0_5.md
-```
-
-The commit was:
+The close-out commit is intended to contain exactly:
 
 ```text
-437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-docs: Remove obsolete project-control files
+docs/ace_architecture.md
+docs/project_summary.md
+docs/todo.md
 ```
 
-After push:
+At formal session close, local `HEAD` and `origin/main` must be
+aligned at the commit containing this summary.
 
-```text
-HEAD:        437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-origin/main: 437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-behind/ahead: 0 0
-```
-
-### OCI
-
-OCI fast-forwarded from:
-
-```text
-0dfd4cf
-```
-
-to:
-
-```text
-437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-```
-
-Final OCI verification reported:
-
-```text
-## main...origin/main
-HEAD:        437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-origin/main: 437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-```
-
-OCI was clean and aligned with `origin/main`.
-
-## Repository state before final close-out commit
-
-Ubuntu `HEAD` and `origin/main` are aligned at:
-
-```text
-437d29dcb1e46a9a0fc1f1270e34eabd1d7cb95d
-```
-
-The following bootstrap changes remain preserved and outside the
-documentation cleanup:
+The following existing changes remain preserved and outside this
+commit, pending application and testing of the reviewed drafts:
 
 ```text
  M scripts/bootstrap.sh
@@ -314,59 +223,42 @@ documentation cleanup:
 ?? src/common/read_required_modules.py
 ```
 
-The following untracked file also remains preserved:
-
-```text
-?? docs/project_memory.md
-```
-
-The final close-out commit must contain only:
-
-```text
-docs/project_summary.md
-docs/todo.md
-```
-
-After that commit is pushed, Ubuntu `HEAD` and `origin/main` must again
-be aligned.
-
 ## Unresolved issues
 
-### Project-memory disposition
+### Step 0.6 bootstrap — drafts pending application and test
 
-The four-layer theoretical model, appendicitis example, propagation
-concepts, disclosure guidance, and LinkedIn material require
-classification.
+The reviewed revisions to `scripts/bootstrap.sh`,
+`src/common/read_required_modules.py`, and
+`src/common/read_required_dirs.py` must be applied to the working
+tree, the affected test files updated to match the new interfaces
+(`--config` flag, `IMPORT FAILED` vs `MISSING` exit codes, safe-import
+mechanism), and all required local/OCI verification run, before any
+of it may be committed.
 
-### Step 0.6 bootstrap
+### `--real-db` mode
 
-Bootstrap implementation, isolated fixtures, verification protocol,
-local verification, and OCI real-database verification remain
-unfinished.
+Remains unimplemented. Requires review of the approved
+`db_connection.py` interface before design can proceed.
 
 ### Step 0.5 evidence
 
-Preserved evidence must be checked for explicit execution with:
-
-```text
-SNOMED_TEST_REAL_DB=true
-```
+Unchanged from prior sessions — preserved evidence must be checked for
+explicit execution with `SNOMED_TEST_REAL_DB=true`.
 
 ### OCI environment
 
-The actual OCI virtual-environment name and path remain unresolved.
-
-The current Oracle Database version, patch level, and earlier failed
-26ai update or patch state require verification.
+Unchanged — actual OCI virtual-environment name/path and current
+Oracle Database version/patch state remain unverified.
 
 ### Contacts
 
-The new person responsible for Jan’s OCI environment has not yet been
-identified.
+Jakub Horák's removal from the contacts plan is agreed but not yet
+applied to `docs/contacts.md`. The new OCI-responsible contact remains
+unidentified.
 
 ## Immediate next step
 
-Start a new substantial session.
+Start a new session.
 
 The next session should:
 
@@ -374,10 +266,9 @@ The next session should:
 2. Read this project summary.
 3. Verify the live Ubuntu repository state.
 4. Read `docs/todo.md`.
-5. Inspect `docs/infrastructure.md` only for possible overlap with the
-   theoretical material in `docs/project_memory.md`.
-6. Decide the proper destination, if any, for that material.
-7. Delete or repurpose `docs/project_memory.md` only after relevant
-   content has been preserved.
-8. Resume Step 0.6 bootstrap close-out after the control-document work
-   is resolved.
+5. Apply the reviewed `bootstrap.sh`, `read_required_modules.py`, and
+   `read_required_dirs.py` revisions to the working tree.
+6. Update the affected bootstrap test files to match the new
+   interfaces.
+7. Run all required local bootstrap tests, then OCI verification.
+8. Commit and push the Step 0.6 work once tested.
