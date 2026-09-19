@@ -1,0 +1,8 @@
+{
+  "_arc_file": "config/required_modules.json",
+  "required_modules": [
+    {"import_name": "oracledb", "package_name": "oracledb"},
+    {"import_name": "omegaconf", "package_name": "omegaconf"},
+    {"import_name": "yaml", "package_name": "PyYAML"}
+  ]
+}

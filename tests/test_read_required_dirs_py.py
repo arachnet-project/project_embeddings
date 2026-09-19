@@ -4,12 +4,18 @@
 # Arachnet Clinical Terminology Embeddings — read_required_dirs.py Test
 # =============================================================================
 # Purpose:
-#   Tests for src/common/read_required_dirs.py.
+#   Tests for src/common/read_required_dirs.py (v2.0).
 #   Tests successful parsing, output format, and error handling for
-#   missing file, invalid YAML, and missing/invalid keys.
-#   Runs the script as a subprocess against temporary YAML files —
-#   no dependency on the real config/directory_structure.yaml content,
-#   except for one test that checks the real file is valid.
+#   missing file, invalid YAML, non-mapping YAML, invalid UTF-8,
+#   missing/invalid keys, non-string/empty/whitespace entries, unsafe
+#   path components (leading "/", "..", ".", and empty components —
+#   the exact class of component PurePosixPath was found to silently
+#   normalize away, which motivated the v2.0 literal-string check),
+#   embedded control characters, duplicate entries, and atomicity of
+#   output on a later invalid entry.
+#   Runs the script as a subprocess via its documented --config
+#   option — no dependency on the real config/directory_structure.yaml
+#   content, except for one test that checks the real file is valid.
 #
 # Run with:
 #   python tests/test_read_required_dirs_py.py
@@ -19,13 +25,16 @@
 #   src/common/read_required_dirs.py present.
 #
 # Author: Jan Mura
-# Version: 1.0
+# Version: 2.0
+# Last modified: 2026-09-11
 # =============================================================================
 
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+import yaml
 
 # ---------------------------------------------------------------------------
 # Path setup
@@ -90,14 +99,14 @@ def _summarise() -> int:
 # ---------------------------------------------------------------------------
 
 def _run_script(config_path):
-    """Run read_required_dirs.py with PROJECT_ROOT temporarily faked.
+    """Run read_required_dirs.py, optionally against a custom config.
 
-    Since the script computes its own project root from __file__, we
-    instead copy the script content approach: run it with a modified
-    sys.path is not enough because _CONFIG_PATH is computed from
-    __file__ location, not cwd. So for tests with custom YAML, we
-    invoke the script's main() logic via a small wrapper that monkeypatches
-    _CONFIG_PATH — done by running a short inline Python snippet.
+    Invokes the script exactly as it is documented to be invoked: with
+    no arguments (real production config, its own resolved default),
+    or with --config PATH (test isolation, per the script's own
+    Usage). This does not touch the script's internals or any
+    module-level attribute — it exercises the real, supported CLI
+    surface only.
 
     Parameters
     ----------
@@ -110,31 +119,47 @@ def _run_script(config_path):
     subprocess.CompletedProcess
         Result of running the script.
     """
-    if config_path is None:
-        return subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            capture_output=True, text=True,
-        )
-
-    # Run via inline snippet that patches _CONFIG_PATH before calling main()
-    snippet = (
-        "import sys, runpy\n"
-        "from pathlib import Path\n"
-        "sys.path.insert(0, '{}')\n"
-        "import importlib.util\n"
-        "spec = importlib.util.spec_from_file_location('rrd', '{}')\n"
-        "mod = importlib.util.module_from_spec(spec)\n"
-        "spec.loader.exec_module(mod)\n"
-        "mod._CONFIG_PATH = Path('{}')\n"
-        "mod.main()\n"
-    ).format(
-        str(SCRIPT_PATH.parent), str(SCRIPT_PATH), str(config_path)
-    )
+    args = [sys.executable, str(SCRIPT_PATH)]
+    if config_path is not None:
+        args += ["--config", str(config_path)]
     return subprocess.run(
-        [sys.executable, "-c", snippet],
+        args,
         capture_output=True, text=True,
     )
 # --- end _run_script ---
+
+
+def _make_temp_config_dir():
+    """Return a fresh, process-owned temporary directory for config
+    fixtures.
+
+    Using a directory obtained from tempfile.TemporaryDirectory (or
+    mkdtemp) rather than a predictable, shared filename under the
+    system temp dir avoids acting on a path another process or user
+    might own — a fixed name like
+    "<tmpdir>/does_not_exist_12345.yaml" is guessable and shared, so
+    an existence check followed by unlink() on it is unsafe.
+
+    Returns
+    -------
+    tempfile.TemporaryDirectory
+        Caller is responsible for holding a reference and letting it
+        clean itself up (e.g. via a `with` block), which removes the
+        directory and everything under it — including any file that
+        was never created — with no separate unlink() needed.
+    """
+    return tempfile.TemporaryDirectory()
+# --- end _make_temp_config_dir ---
+
+
+def _write_config(tmpdir, content):
+    """Write YAML text content to a fresh file inside tmpdir and
+    return its Path."""
+    path = Path(tmpdir) / "directory_structure.yaml"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return path
+# --- end _write_config ---
 
 
 # =============================================================================
@@ -143,16 +168,15 @@ def _run_script(config_path):
 
 # --- test_prints_each_directory_on_own_line ---
 def test_prints_each_directory_on_own_line():
-    """Script prints each required directory on its own line."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
-        f.write("required_directories:\n  - log\n  - wrk\n  - tests/results\n")
-        config_path = Path(f.name)
-
-    try:
+    """Script prints each required directory on its own line, with no
+    stderr output on success."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir,
+            "required_directories:\n  - log\n  - wrk\n  - tests/results\n",
+        )
         result = _run_script(config_path)
-        lines = result.stdout.strip().splitlines()
+        lines = result.stdout.splitlines()
         expected = ["log", "wrk", "tests/results"]
         if lines != expected:
             _report("prints each directory on own line",
@@ -162,15 +186,23 @@ def test_prints_each_directory_on_own_line():
             _report("prints each directory on own line",
                     _FAIL, "returncode={}".format(result.returncode))
             return
+        if result.stderr != "":
+            _report("prints each directory on own line",
+                    _FAIL, "stderr={!r} expected empty".format(result.stderr))
+            return
         _report("prints each directory on own line", _PASS)
-    finally:
-        config_path.unlink()
 # --- end test_prints_each_directory_on_own_line ---
 
 
 # --- test_real_config_is_valid ---
 def test_real_config_is_valid():
-    """The real config/directory_structure.yaml parses successfully."""
+    """The real config/directory_structure.yaml parses successfully,
+    prints at least one validated directory, and produces no stderr.
+
+    This is a structural integration check. The configuration file
+    remains the single source of truth for the exact required-
+    directory set.
+    """
     if not REAL_CONFIG.exists():
         _report("real config is valid",
                 _FAIL, "file not found: {}".format(REAL_CONFIG))
@@ -186,44 +218,55 @@ def test_real_config_is_valid():
         _report("real config is valid",
                 _FAIL, "no directories printed")
         return
+    if result.stderr != "":
+        _report("real config is valid",
+                _FAIL, "stderr={!r} expected empty".format(result.stderr))
+        return
     _report("real config is valid", _PASS)
 # --- end test_real_config_is_valid ---
 
 
 # =============================================================================
-# Tests -- failure paths
+# Tests -- failure paths: file / parse level
 # =============================================================================
 
 # --- test_missing_file_exits_1 ---
 def test_missing_file_exits_1():
-    """Script exits 1 with stderr message when YAML file does not exist."""
-    missing_path = Path(tempfile.gettempdir()) / "does_not_exist_12345.yaml"
-    if missing_path.exists():
-        missing_path.unlink()
+    """Script exits 1 with stderr message, empty stdout, when the YAML
+    file does not exist.
 
-    result = _run_script(missing_path)
-    if result.returncode != 1:
-        _report("missing file exits 1",
-                _FAIL, "returncode={}".format(result.returncode))
-        return
-    if "not found" not in result.stderr:
-        _report("missing file exits 1",
-                _FAIL, "stderr={!r}".format(result.stderr))
-        return
-    _report("missing file exits 1", _PASS)
+    Uses a path inside a freshly created, process-owned temporary
+    directory that is never written to, rather than a predictable
+    shared filename — see _make_temp_config_dir.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        missing_path = Path(tmpdir) / "does_not_exist.yaml"
+
+        result = _run_script(missing_path)
+        if result.returncode != 1:
+            _report("missing file exits 1",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not found" not in result.stderr:
+            _report("missing file exits 1",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("missing file exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("missing file exits 1", _PASS)
 # --- end test_missing_file_exits_1 ---
 
 
 # --- test_invalid_yaml_exits_1 ---
 def test_invalid_yaml_exits_1():
-    """Script exits 1 with stderr message when YAML is malformed."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
-        f.write("required_directories: [unclosed\n")
-        config_path = Path(f.name)
-
-    try:
+    """Script exits 1 with stderr message, empty stdout, when YAML is
+    malformed."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories: [unclosed\n"
+        )
         result = _run_script(config_path)
         if result.returncode != 1:
             _report("invalid yaml exits 1",
@@ -233,22 +276,57 @@ def test_invalid_yaml_exits_1():
             _report("invalid yaml exits 1",
                     _FAIL, "stderr={!r}".format(result.stderr))
             return
+        if result.stdout != "":
+            _report("invalid yaml exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
         _report("invalid yaml exits 1", _PASS)
-    finally:
-        config_path.unlink()
 # --- end test_invalid_yaml_exits_1 ---
 
 
+# --- test_invalid_utf8_exits_1 ---
+def test_invalid_utf8_exits_1():
+    """Script exits 1 with stderr message, empty stdout, when the file
+    contains a byte sequence that is not valid UTF-8.
+
+    load_registry() explicitly catches UnicodeDecodeError; this
+    exercises that branch directly, writing raw bytes rather than
+    going through the text-mode _write_config helper.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = Path(tmpdir) / "directory_structure.yaml"
+        with open(config_path, "wb") as f:
+            f.write(b"required_directories:\n  - log\n\xff\xfe\n")
+
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("invalid utf-8 exits 1",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "invalid UTF-8" not in result.stderr:
+            _report("invalid utf-8 exits 1",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("invalid utf-8 exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("invalid utf-8 exits 1", _PASS)
+# --- end test_invalid_utf8_exits_1 ---
+
+
+# =============================================================================
+# Tests -- failure paths: top-level shape
+# =============================================================================
+
 # --- test_missing_key_exits_1 ---
 def test_missing_key_exits_1():
-    """Script exits 1 with stderr message when required_directories key is absent."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
-        f.write("some_other_key:\n  - foo\n")
-        config_path = Path(f.name)
-
-    try:
+    """Script exits 1 with stderr message, empty stdout, when
+    required_directories key is absent from a mapping document."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "some_other_key:\n  - foo\n"
+        )
         result = _run_script(config_path)
         if result.returncode != 1:
             _report("missing key exits 1",
@@ -258,60 +336,441 @@ def test_missing_key_exits_1():
             _report("missing key exits 1",
                     _FAIL, "stderr={!r}".format(result.stderr))
             return
+        if result.stdout != "":
+            _report("missing key exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
         _report("missing key exits 1", _PASS)
-    finally:
-        config_path.unlink()
 # --- end test_missing_key_exits_1 ---
+
+
+# --- test_top_level_non_mapping_exits_1 ---
+def test_top_level_non_mapping_exits_1():
+    """Script exits 1 with stderr message, empty stdout, when the
+    top-level YAML document is a list rather than a mapping.
+
+    Hits the same "'required_directories' key not found" branch as
+    test_missing_key_exits_1, but via isinstance(data, dict) failing
+    outright rather than a dict missing the key — a distinct document
+    shape worth covering directly.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "- log\n- wrk\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("top-level non-mapping exits 1",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "required_directories" not in result.stderr:
+            _report("top-level non-mapping exits 1",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("top-level non-mapping exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("top-level non-mapping exits 1", _PASS)
+# --- end test_top_level_non_mapping_exits_1 ---
 
 
 # --- test_non_list_value_exits_1 ---
 def test_non_list_value_exits_1():
-    """Script exits 1 with stderr message when required_directories is not a list."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
-        f.write("required_directories: not_a_list\n")
-        config_path = Path(f.name)
-
-    try:
+    """Script exits 1 with stderr message, empty stdout, when
+    required_directories is not a list."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories: not_a_list\n"
+        )
         result = _run_script(config_path)
         if result.returncode != 1:
             _report("non-list value exits 1",
                     _FAIL, "returncode={}".format(result.returncode))
             return
-        if "not a list" not in result.stderr:
+        if "is not a non-empty list" not in result.stderr:
             _report("non-list value exits 1",
                     _FAIL, "stderr={!r}".format(result.stderr))
             return
+        if result.stdout != "":
+            _report("non-list value exits 1",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
         _report("non-list value exits 1", _PASS)
-    finally:
-        config_path.unlink()
 # --- end test_non_list_value_exits_1 ---
 
 
-# --- test_empty_list_prints_nothing ---
-def test_empty_list_prints_nothing():
-    """Script exits 0 and prints nothing when required_directories is empty."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False
-    ) as f:
-        f.write("required_directories: []\n")
-        config_path = Path(f.name)
+# --- test_empty_list_rejected ---
+def test_empty_list_rejected():
+    """Script exits 1 with stderr message, empty stdout, when
+    required_directories is an empty list.
 
-    try:
+    v2.0 treats an empty required-directories registry as invalid
+    configuration (most likely a truncated or misconfigured file)
+    rather than a degenerate "nothing required" state, matching
+    read_required_modules.py's identical non-empty-list requirement.
+    Confirmed with Jan as the intended behavior, not reverted.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories: []\n"
+        )
         result = _run_script(config_path)
-        if result.returncode != 0:
-            _report("empty list prints nothing",
+        if result.returncode != 1:
+            _report("empty list rejected",
                     _FAIL, "returncode={}".format(result.returncode))
             return
-        if result.stdout.strip() != "":
-            _report("empty list prints nothing",
-                    _FAIL, "stdout={!r}".format(result.stdout))
+        if "is not a non-empty list" not in result.stderr:
+            _report("empty list rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
             return
-        _report("empty list prints nothing", _PASS)
-    finally:
-        config_path.unlink()
-# --- end test_empty_list_prints_nothing ---
+        if result.stdout != "":
+            _report("empty list rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("empty list rejected", _PASS)
+# --- end test_empty_list_rejected ---
+
+
+# =============================================================================
+# Tests -- failure paths: per-entry type/content checks
+# =============================================================================
+
+# --- test_non_string_entry_rejected ---
+def test_non_string_entry_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    is not a string (e.g. a YAML integer)."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - 123\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("non-string entry rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "is not a string" not in result.stderr:
+            _report("non-string entry rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("non-string entry rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("non-string entry rejected", _PASS)
+# --- end test_non_string_entry_rejected ---
+
+
+# --- test_empty_string_entry_rejected ---
+def test_empty_string_entry_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    is an empty string."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, 'required_directories:\n  - ""\n'
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("empty string entry rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "is empty" not in result.stderr:
+            _report("empty string entry rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("empty string entry rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("empty string entry rejected", _PASS)
+# --- end test_empty_string_entry_rejected ---
+
+
+# --- test_whitespace_entry_rejected ---
+def test_whitespace_entry_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    has leading or trailing whitespace.
+
+    Uses a double-quoted YAML scalar so the leading space is preserved
+    by the parser rather than trimmed as part of a plain scalar.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, 'required_directories:\n  - " log"\n'
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("whitespace entry rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "leading or trailing whitespace" not in result.stderr:
+            _report("whitespace entry rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("whitespace entry rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("whitespace entry rejected", _PASS)
+# --- end test_whitespace_entry_rejected ---
+
+
+# =============================================================================
+# Tests -- failure paths: unsafe path components
+# =============================================================================
+
+# --- test_absolute_path_rejected ---
+def test_absolute_path_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    is an absolute path."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - /etc/passwd\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("absolute path rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not a safe relative directory path" not in result.stderr:
+            _report("absolute path rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("absolute path rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("absolute path rejected", _PASS)
+# --- end test_absolute_path_rejected ---
+
+
+# --- test_parent_traversal_rejected ---
+def test_parent_traversal_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    contains a ".." path component."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - log\n  - ../escape\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("parent traversal rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not a safe relative directory path" not in result.stderr:
+            _report("parent traversal rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("parent traversal rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("parent traversal rejected", _PASS)
+# --- end test_parent_traversal_rejected ---
+
+
+# --- test_dot_component_rejected ---
+def test_dot_component_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    contains a "." path component embedded between real components.
+
+    Protects the specific regression identified during v2.0 review:
+    PurePosixPath("log/./archive") silently normalizes to
+    PosixPath("log/archive"), which is why validation was corrected to
+    split on the literal string instead.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - log/./archive\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("dot component rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not a safe relative directory path" not in result.stderr:
+            _report("dot component rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("dot component rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("dot component rejected", _PASS)
+# --- end test_dot_component_rejected ---
+
+
+# --- test_double_slash_rejected ---
+def test_double_slash_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    contains an empty path component from a repeated slash
+    (e.g. "log//archive").
+
+    Same PurePosixPath-normalization regression class as the "."
+    case: PurePosixPath("log//archive") silently collapses to
+    PosixPath("log/archive").
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - log//archive\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("double slash rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not a safe relative directory path" not in result.stderr:
+            _report("double slash rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("double slash rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("double slash rejected", _PASS)
+# --- end test_double_slash_rejected ---
+
+
+# --- test_trailing_slash_rejected ---
+def test_trailing_slash_rejected():
+    """Script exits 1 with stderr message, empty stdout, when an entry
+    has a trailing slash, producing an empty final path component
+    (e.g. "log/").
+
+    Same PurePosixPath-normalization regression class: PurePosixPath
+    silently strips a trailing slash rather than treating it as an
+    empty component to reject.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - log/\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("trailing slash rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "not a safe relative directory path" not in result.stderr:
+            _report("trailing slash rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("trailing slash rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("trailing slash rejected", _PASS)
+# --- end test_trailing_slash_rejected ---
+
+
+# =============================================================================
+# Tests -- failure paths: control characters and duplicates
+# =============================================================================
+
+# --- test_control_char_rejected ---
+def test_control_char_rejected():
+    """Script exits 1 with the control-character diagnostic, empty
+    stdout, when an entry contains an embedded control character.
+
+    The fixture is self-checked before the script is invoked: the YAML
+    text is parsed independently with yaml.safe_load and the resulting
+    string is asserted to actually contain a character below 0x20, so
+    this test cannot pass merely because the YAML failed to parse (a
+    distinct branch already covered by test_invalid_yaml_exits_1). A
+    double-quoted YAML scalar with a \\n escape is used because plain
+    block-style scalars cannot represent an embedded newline at all.
+    """
+    yaml_text = 'required_directories:\n  - "log\\nwrk"\n'
+
+    # Self-check: confirm the fixture actually round-trips to a string
+    # containing a real control character, independent of the script
+    # under test. Reported as an ordinary FAIL through this suite's
+    # own reporting framework -- not a bare assert -- so a fixture bug
+    # shows up in the pass/fail summary like any other failure rather
+    # than aborting the run.
+    parsed = yaml.safe_load(yaml_text)
+    entry = parsed["required_directories"][0]
+    if not any(ord(ch) < 32 for ch in entry):
+        _report(
+            "control char rejected",
+            _FAIL,
+            "fixture contains no control character: {!r}".format(entry),
+        )
+        return
+
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(tmpdir, yaml_text)
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("control char rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "contains a control character" not in result.stderr:
+            _report("control char rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("control char rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("control char rejected", _PASS)
+# --- end test_control_char_rejected ---
+
+
+# --- test_duplicate_entry_rejected ---
+def test_duplicate_entry_rejected():
+    """Script exits 1 with stderr message, empty stdout, when the same
+    directory entry appears twice."""
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir, "required_directories:\n  - log\n  - log\n"
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("duplicate entry rejected",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if "duplicate directory entry" not in result.stderr:
+            _report("duplicate entry rejected",
+                    _FAIL, "stderr={!r}".format(result.stderr))
+            return
+        if result.stdout != "":
+            _report("duplicate entry rejected",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("duplicate entry rejected", _PASS)
+# --- end test_duplicate_entry_rejected ---
+
+
+# =============================================================================
+# Tests -- output atomicity
+# =============================================================================
+
+# --- test_no_partial_output_on_later_invalid_entry ---
+def test_no_partial_output_on_later_invalid_entry():
+    """Script prints nothing at all -- not even the earlier valid
+    entries -- when a later entry in the list is invalid.
+
+    Protects validate_registry's documented guarantee that "the
+    complete registry is validated before any entry is returned, so
+    callers never receive a partially valid list": the two valid
+    entries preceding the bad one must not leak onto stdout.
+    """
+    with _make_temp_config_dir() as tmpdir:
+        config_path = _write_config(
+            tmpdir,
+            "required_directories:\n  - log\n  - wrk\n  - ../escape\n",
+        )
+        result = _run_script(config_path)
+        if result.returncode != 1:
+            _report("no partial output on later invalid entry",
+                    _FAIL, "returncode={}".format(result.returncode))
+            return
+        if result.stdout != "":
+            _report("no partial output on later invalid entry",
+                    _FAIL, "stdout={!r} expected empty".format(result.stdout))
+            return
+        _report("no partial output on later invalid entry", _PASS)
+# --- end test_no_partial_output_on_later_invalid_entry ---
 
 
 # =============================================================================
@@ -327,14 +786,42 @@ def main() -> None:
     print("-- happy paths --")
     test_prints_each_directory_on_own_line()
     test_real_config_is_valid()
-    test_empty_list_prints_nothing()
     print("")
 
-    print("-- failure paths --")
+    print("-- file / parse level --")
     test_missing_file_exits_1()
     test_invalid_yaml_exits_1()
+    test_invalid_utf8_exits_1()
+    print("")
+
+    print("-- top-level shape --")
     test_missing_key_exits_1()
+    test_top_level_non_mapping_exits_1()
     test_non_list_value_exits_1()
+    test_empty_list_rejected()
+    print("")
+
+    print("-- per-entry type/content checks --")
+    test_non_string_entry_rejected()
+    test_empty_string_entry_rejected()
+    test_whitespace_entry_rejected()
+    print("")
+
+    print("-- unsafe path components --")
+    test_absolute_path_rejected()
+    test_parent_traversal_rejected()
+    test_dot_component_rejected()
+    test_double_slash_rejected()
+    test_trailing_slash_rejected()
+    print("")
+
+    print("-- control characters and duplicates --")
+    test_control_char_rejected()
+    test_duplicate_entry_rejected()
+    print("")
+
+    print("-- output atomicity --")
+    test_no_partial_output_on_later_invalid_entry()
 
     sys.exit(_summarise())
 # --- end main ---

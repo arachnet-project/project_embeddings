@@ -6,6 +6,15 @@
 # Covers always-required vars, OCI branch via TNS_ADMIN, accumulation
 # of multiple missing vars, and Ubuntu/OCI distinction.
 #
+# SNOMED_SYS_DB_PASSWORD is deliberately NOT among the vars
+# check_env_vars requires: the Phase 0/1 Oracle boundary (todo.md
+# §3.5) forbids either bootstrap mode from requiring SYS/SYSDBA
+# credentials. An earlier version of bootstrap.sh actively violated
+# this by requiring SNOMED_SYS_DB_PASSWORD whenever TNS_ADMIN was set;
+# that check was removed as part of the Step 0.6 revision.
+# test_oci_sys_db_password_not_required below is a regression guard
+# for that removal, not a leftover from before it.
+#
 # Run with:
 #   python tests/test_bootstrap_r4_py.py
 #
@@ -15,8 +24,8 @@
 #   PROJECT_ROOT set or auto-detectable.
 #
 # Author: Jan Mura
-# Version: 1.0
-# Last modified: 2026-07-02
+# Version: 1.2
+# Last modified: 2026-09-14
 # =============================================================================
 
 import os
@@ -74,8 +83,16 @@ def _base_env() -> dict:
     """Return a minimal env dict that passes all checks before check_env_vars.
 
     Relies on the calling process already having: venv active, python3
-    correct, modules installed. Sets only the vars that check_env_vars
-    cares about, leaving the rest to the inherited environment.
+    correct, modules installed. Sets every var check_env_vars cares
+    about explicitly -- including forcing SNOMED_SYS_DB_PASSWORD
+    absent -- and pins PROJECT_ROOT to this repository, so results
+    depend on this fixture rather than on whatever the caller's shell
+    happens to have exported. Without the explicit PROJECT_ROOT
+    override, an inherited value could point bootstrap at an unrelated
+    directory and cause it to fail earlier (e.g. at check_venv) for
+    reasons unrelated to what these tests exercise. Without explicitly
+    unsetting SNOMED_SYS_DB_PASSWORD, an inherited value would silently
+    defeat test_oci_sys_db_password_not_required's whole purpose.
 
     Returns
     -------
@@ -83,6 +100,7 @@ def _base_env() -> dict:
         Overrides to pass to _run.
     """
     return {
+        "PROJECT_ROOT": str(PROJECT_ROOT),
         "SNOMED_LOG_DIR": "/tmp/ace_test_logs",
         "SNOMED_LOG_LEVEL": "INFO",
         "TNS_ADMIN": None,
@@ -185,12 +203,16 @@ def test_missing_both_always_required() -> None:
 
 # --- test_oci_all_vars_set ---
 def test_oci_all_vars_set() -> None:
-    """OCI: TNS_ADMIN set, all DB password vars set — passes."""
+    """OCI: TNS_ADMIN set, both DB password vars set — passes.
+
+    Deliberately does not set SNOMED_SYS_DB_PASSWORD: it is not part
+    of the required set (see module docstring / todo.md §3.5), so a
+    passing case must not depend on it being present.
+    """
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     env["SNOMED_DB_PASSWORD"] = "secret1"
     env["SNOMED_STAGE_DB_PASSWORD"] = "secret2"
-    env["SNOMED_SYS_DB_PASSWORD"] = "secret3"
     result = _run(env)
     if result.returncode == 0:
         _record("oci_all_vars_set", _PASS)
@@ -199,13 +221,38 @@ def test_oci_all_vars_set() -> None:
 # --- end test_oci_all_vars_set ---
 
 
+# --- test_oci_sys_db_password_not_required ---
+def test_oci_sys_db_password_not_required() -> None:
+    """OCI: every other OCI var set, SNOMED_SYS_DB_PASSWORD absent —
+    still passes.
+
+    Regression guard for the Phase 0/1 Oracle boundary (todo.md §3.5):
+    neither bootstrap mode may require SYS/SYSDBA credentials. An
+    earlier version of bootstrap.sh violated this by requiring
+    SNOMED_SYS_DB_PASSWORD whenever TNS_ADMIN was set; this test fails
+    if that requirement is ever reintroduced.
+    """
+    env = _base_env()
+    env["TNS_ADMIN"] = "/opt/oracle/wallet"
+    env["SNOMED_DB_PASSWORD"] = "secret1"
+    env["SNOMED_STAGE_DB_PASSWORD"] = "secret2"
+    # SNOMED_SYS_DB_PASSWORD is explicitly forced absent by
+    # _base_env() (not merely assumed absent from the caller's shell)
+    # -- that guarantee is what makes this test meaningful.
+    result = _run(env)
+    if result.returncode == 0:
+        _record("oci_sys_db_password_not_required", _PASS)
+    else:
+        _record("oci_sys_db_password_not_required", _FAIL, result.stderr.strip())
+# --- end test_oci_sys_db_password_not_required ---
+
+
 # --- test_oci_missing_db_password ---
 def test_oci_missing_db_password() -> None:
     """OCI: SNOMED_DB_PASSWORD missing — fails, named in output."""
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     env["SNOMED_STAGE_DB_PASSWORD"] = "secret2"
-    env["SNOMED_SYS_DB_PASSWORD"] = "secret3"
     result = _run(env)
     if result.returncode != 0 and "SNOMED_DB_PASSWORD" in result.stderr:
         _record("oci_missing_db_password", _PASS)
@@ -220,7 +267,6 @@ def test_oci_missing_stage_db_password() -> None:
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     env["SNOMED_DB_PASSWORD"] = "secret1"
-    env["SNOMED_SYS_DB_PASSWORD"] = "secret3"
     result = _run(env)
     if result.returncode != 0 and "SNOMED_STAGE_DB_PASSWORD" in result.stderr:
         _record("oci_missing_stage_db_password", _PASS)
@@ -229,33 +275,22 @@ def test_oci_missing_stage_db_password() -> None:
 # --- end test_oci_missing_stage_db_password ---
 
 
-# --- test_oci_missing_sys_db_password ---
-def test_oci_missing_sys_db_password() -> None:
-    """OCI: SNOMED_SYS_DB_PASSWORD missing — fails, named in output."""
-    env = _base_env()
-    env["TNS_ADMIN"] = "/opt/oracle/wallet"
-    env["SNOMED_DB_PASSWORD"] = "secret1"
-    env["SNOMED_STAGE_DB_PASSWORD"] = "secret2"
-    result = _run(env)
-    if result.returncode != 0 and "SNOMED_SYS_DB_PASSWORD" in result.stderr:
-        _record("oci_missing_sys_db_password", _PASS)
-    else:
-        _record("oci_missing_sys_db_password", _FAIL, result.stderr.strip())
-# --- end test_oci_missing_sys_db_password ---
-
-
 # --- test_oci_all_db_passwords_missing ---
 def test_oci_all_db_passwords_missing() -> None:
-    """OCI: all three DB password vars missing — fails, all three named."""
+    """OCI: both DB password vars missing — fails, both named.
+
+    Only SNOMED_DB_PASSWORD and SNOMED_STAGE_DB_PASSWORD are checked;
+    SNOMED_SYS_DB_PASSWORD is not part of the required set (see module
+    docstring), so it is not asserted here.
+    """
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     result = _run(env)
-    all_named = (
+    both_named = (
         "SNOMED_DB_PASSWORD" in result.stderr
         and "SNOMED_STAGE_DB_PASSWORD" in result.stderr
-        and "SNOMED_SYS_DB_PASSWORD" in result.stderr
     )
-    if result.returncode != 0 and all_named:
+    if result.returncode != 0 and both_named:
         _record("oci_all_db_passwords_missing", _PASS)
     else:
         _record("oci_all_db_passwords_missing", _FAIL, result.stderr.strip())
@@ -264,7 +299,11 @@ def test_oci_all_db_passwords_missing() -> None:
 
 # --- test_oci_always_required_and_db_passwords_missing ---
 def test_oci_always_required_and_db_passwords_missing() -> None:
-    """OCI: always-required and DB password vars all missing — all named."""
+    """OCI: always-required and DB password vars all missing — all named.
+
+    SNOMED_SYS_DB_PASSWORD is not part of the required set (see module
+    docstring), so it is not asserted here.
+    """
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     env["SNOMED_LOG_DIR"] = None
@@ -275,7 +314,6 @@ def test_oci_always_required_and_db_passwords_missing() -> None:
         and "SNOMED_LOG_LEVEL" in result.stderr
         and "SNOMED_DB_PASSWORD" in result.stderr
         and "SNOMED_STAGE_DB_PASSWORD" in result.stderr
-        and "SNOMED_SYS_DB_PASSWORD" in result.stderr
     )
     if result.returncode != 0 and all_named:
         _record("oci_always_required_and_db_passwords_missing", _PASS)
@@ -301,9 +339,9 @@ def main() -> None:
     test_missing_snomed_log_level()
     test_missing_both_always_required()
     test_oci_all_vars_set()
+    test_oci_sys_db_password_not_required()
     test_oci_missing_db_password()
     test_oci_missing_stage_db_password()
-    test_oci_missing_sys_db_password()
     test_oci_all_db_passwords_missing()
     test_oci_always_required_and_db_passwords_missing()
 
