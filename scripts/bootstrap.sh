@@ -14,8 +14,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.9
-# Last modified: 2026-09-06
+# Version: 1.10
+# Last modified: 2026-09-19
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -649,13 +649,23 @@ print_environment_summary() {
     # check results. Called only after every check has passed — each
     # check function exits immediately on failure, so reaching this
     # point means all listed results are OK.
+    #
+    # Mode is derived from the same TNS_ADMIN condition check_env_vars
+    # uses to decide whether OCI credential checks apply — the two
+    # must never disagree about which mode was actually checked. A
+    # separate global mode variable is deliberately not introduced;
+    # TNS_ADMIN itself remains the single source of truth for mode.
     echo ""
     echo "=== Environment summary ==="
     echo "Project root: ${RESOLVED_ROOT}"
     echo "Virtual environment: ${resolved_venv}"
     echo "Python executable: ${PYTHON}"
     echo "Python version: ${PYTHON_VERSION}"
-    echo "Mode: local"
+    if [[ -n "${TNS_ADMIN:-}" ]]; then
+        echo "Mode: OCI/production"
+    else
+        echo "Mode: local"
+    fi
     echo "Check results:"
     echo "  Project root: OK"
     echo "  Virtual environment: OK"

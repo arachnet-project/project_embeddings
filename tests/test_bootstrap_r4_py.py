@@ -24,8 +24,8 @@
 #   PROJECT_ROOT set or auto-detectable.
 #
 # Author: Jan Mura
-# Version: 1.2
-# Last modified: 2026-09-14
+# Version: 1.3
+# Last modified: 2026-09-19
 # =============================================================================
 
 import os
@@ -135,12 +135,28 @@ def _record(name: str, result: str, detail: str = "") -> None:
 
 # --- test_ubuntu_all_required_set ---
 def test_ubuntu_all_required_set() -> None:
-    """Ubuntu: always-required vars set, no TNS_ADMIN — passes."""
+    """Ubuntu: always-required vars set, no TNS_ADMIN — passes and
+    reports local mode.
+
+    Asserts the environment-summary mode line explicitly, not just
+    the return code: a hardcoded "Mode: local" line would pass a
+    return-code-only check even on an OCI run where check_env_vars
+    actually took the TNS_ADMIN/OCI branch, which is exactly the
+    defect this test guards against. Checked as an exact output line
+    (not a substring of stdout), so an unrelated longer line
+    containing this text could not satisfy the assertion. On failure,
+    both stdout and stderr are included -- an incorrect summary is a
+    stdout-content problem and normally leaves stderr empty, so a
+    stderr-only diagnostic would not show what actually went wrong.
+    """
     result = _run(_base_env())
-    if result.returncode == 0:
+    if result.returncode == 0 and "Mode: local" in result.stdout.splitlines():
         _record("ubuntu_all_required_set", _PASS)
     else:
-        _record("ubuntu_all_required_set", _FAIL, result.stderr.strip())
+        detail = "returncode={} stdout={!r} stderr={!r}".format(
+            result.returncode, result.stdout.strip(), result.stderr.strip()
+        )
+        _record("ubuntu_all_required_set", _FAIL, detail)
 # --- end test_ubuntu_all_required_set ---
 
 
@@ -203,21 +219,36 @@ def test_missing_both_always_required() -> None:
 
 # --- test_oci_all_vars_set ---
 def test_oci_all_vars_set() -> None:
-    """OCI: TNS_ADMIN set, both DB password vars set — passes.
+    """OCI: TNS_ADMIN set, both DB password vars set — passes and
+    reports OCI/production mode.
 
     Deliberately does not set SNOMED_SYS_DB_PASSWORD: it is not part
     of the required set (see module docstring / todo.md §3.5), so a
     passing case must not depend on it being present.
+
+    Asserts the environment-summary mode line explicitly, not just
+    the return code -- this is the counterpart to
+    test_ubuntu_all_required_set's mode assertion, and together the
+    two are why a hardcoded "Mode: local" line was not caught by this
+    suite on Ubuntu: the OCI branch was never checked for its own
+    summary output, only its return code. Checked as an exact output
+    line (not a substring of stdout), so an unrelated longer line
+    containing this text could not satisfy the assertion. On failure,
+    both stdout and stderr are included, since an incorrect summary is
+    a stdout-content problem and normally leaves stderr empty.
     """
     env = _base_env()
     env["TNS_ADMIN"] = "/opt/oracle/wallet"
     env["SNOMED_DB_PASSWORD"] = "secret1"
     env["SNOMED_STAGE_DB_PASSWORD"] = "secret2"
     result = _run(env)
-    if result.returncode == 0:
+    if result.returncode == 0 and "Mode: OCI/production" in result.stdout.splitlines():
         _record("oci_all_vars_set", _PASS)
     else:
-        _record("oci_all_vars_set", _FAIL, result.stderr.strip())
+        detail = "returncode={} stdout={!r} stderr={!r}".format(
+            result.returncode, result.stdout.strip(), result.stderr.strip()
+        )
+        _record("oci_all_vars_set", _FAIL, detail)
 # --- end test_oci_all_vars_set ---
 
 

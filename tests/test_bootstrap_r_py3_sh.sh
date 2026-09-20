@@ -17,9 +17,23 @@
 #
 # All tests use REAL_PROJECT_ROOT as PROJECT_ROOT so the real venv is
 # inside PROJECT_ROOT and check_venv passes before check_python3 runs.
-# Failure/warning cases inject a fake python3 via PATH that matches on
-# the exact `-c` code string check_python3 invokes, delegating anything
-# unmatched to the real python3.
+# Most failure/warning cases inject a fake python3 via PATH that
+# matches on the exact `-c` code string check_python3 invokes,
+# delegating anything unmatched to the real python3.
+#
+# test_warns_but_succeeds_when_version_below_3_12 is the exception: it
+# builds a fully isolated fake venv directly under PROJECT_ROOT (a
+# hidden directory, not a real venv's typical location) whose fake
+# python3 reports itself as sys.executable, rather than delegating
+# that query to the real interpreter. This is required because
+# bootstrap.sh v1.9 resolves PYTHON from sys.executable once and
+# invokes that resolved path directly for every later version query,
+# instead of re-resolving bare python3 via PATH each time -- a
+# PATH-shadow-only fake is silently bypassed under that mechanism. See
+# the function's own comment for the fuller account (this was found
+# after a reported Ubuntu pass that did not prove the fixture was
+# exercising the simulated version, and a genuine FAIL on OCI, whose
+# real interpreter's version differs from the simulated one).
 #
 # Usage:
 #   bash tests/test_bootstrap_r_py3_sh.sh
@@ -30,8 +44,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.1
-# Last modified: 2026-07-06
+# Version: 1.2
+# Last modified: 2026-09-19
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -303,14 +317,68 @@ PYSCRIPT
 
 # --- test_warns_but_succeeds_when_version_below_3_12 ---
 test_warns_but_succeeds_when_version_below_3_12() {
-    # Delegate sys.executable to the real venv python (so the venv
-    # check passes) but fake the version queries as 3.9.
-    local fake_bin
-    fake_bin=$(mktemp -d)
+    # Isolated fake venv directly under PROJECT_ROOT (a hidden
+    # directory, so check_venv's containment check passes on its own
+    # terms, not via PATH shadowing of the real venv, and so
+    # detect_venv_dir's non-hidden glob elsewhere in this file cannot
+    # pick it up). Deliberately not placed under wrk/: this test
+    # covers check_python3 and must not assume Round 1 has already
+    # run and created that directory -- the file's own documented
+    # preconditions make no such claim.
+    #
+    # The earlier version of this test delegated the sys.executable
+    # query to the real interpreter and faked only the version
+    # queries via a PATH-shadowed python3. That worked against
+    # bootstrap.sh v1.7, which re-resolved bare python3 via PATH for
+    # each version query. Once v1.9 began resolving PYTHON from
+    # sys.executable a single time and invoking that resolved path
+    # directly for every subsequent version query, the PATH-only fake
+    # was bypassed for all of them: the test stopped simulating Python
+    # 3.9 at all and its outcome became dependent on the real venv
+    # Python's actual version instead. On OCI, whose verified
+    # interpreter reported 3.12.12, this correctly produced no
+    # warning -- and so, correctly, a FAIL against this test's own
+    # assertion, exposing the defective fixture. The reason for the
+    # previously reported Ubuntu pass cannot be established from this
+    # test alone without its recorded interpreter output; it is not
+    # evidence that the fixture was ever exercising the simulated
+    # version there either.
+    #
+    # This fixture instead makes the fake itself the interpreter that
+    # sys.executable reports, so PYTHON resolves to the fake and every
+    # later "${PYTHON}" -c invocation inside bootstrap genuinely runs
+    # it -- exercising the real v1.9 resolve-once mechanism rather
+    # than working around it.
+    local fake_venv
+    fake_venv="$(mktemp -d "${REAL_PROJECT_ROOT}/.fake_venv_py39_test_XXXXXX")"
 
-    cat > "${fake_bin}/python3" << PYSCRIPT
+    # Local cleanup, scoped to this function's duration only: removes
+    # the fake venv on any exit from this point forward, including an
+    # interruption or an unexpected error inside the function itself.
+    # Cleared before returning so it cannot affect any later test in
+    # this suite.
+    trap 'rm -rf -- "${fake_venv}"' EXIT
+
+    mkdir -p "${fake_venv}/bin"
+    touch "${fake_venv}/bin/activate"
+
+    local fake_python="${fake_venv}/bin/python3"
+    cat > "${fake_python}" << PYSCRIPT
 #!/bin/bash
-if [[ "\$*" == *"version_info[:2]"* ]]; then
+# Reports its own path for sys.executable, so bootstrap's PYTHON
+# variable resolves to this fake script itself -- every later
+# "\${PYTHON}" -c version query therefore genuinely runs the fake, not
+# the real interpreter. Returns fixed 3.9.0 values for all four
+# version queries check_python3 performs (the [:2]-format version
+# string, major, minor, and the [:3]-format full version used in the
+# environment summary). Delegates every other invocation (module
+# imports, the read_required_modules.py/read_required_dirs.py helper
+# scripts) to the real interpreter so the rest of bootstrap completes
+# normally against the real, installed packages.
+if [[ "\$*" == *"print(sys.executable)"* ]]; then
+    echo "${fake_python}"
+    exit 0
+elif [[ "\$*" == *"version_info[:2]"* ]]; then
     echo "3.9"
     exit 0
 elif [[ "\$*" == *"version_info.major"* ]]; then
@@ -319,19 +387,29 @@ elif [[ "\$*" == *"version_info.major"* ]]; then
 elif [[ "\$*" == *"version_info.minor"* ]]; then
     echo "9"
     exit 0
+elif [[ "\$*" == *"version_info[:3]"* ]]; then
+    echo "3.9.0"
+    exit 0
 fi
 exec "${REAL_PYTHON3}" "\$@"
 PYSCRIPT
-    chmod +x "${fake_bin}/python3"
+    chmod +x "${fake_python}"
 
     local rc=0
     local output
-    output=$(run_bootstrap "${fake_bin}") || rc=$?
+    output=$(
+        PATH="${fake_venv}/bin:${PATH}" \
+        VIRTUAL_ENV="${fake_venv}" \
+        PROJECT_ROOT="${REAL_PROJECT_ROOT}" \
+        bash "${BOOTSTRAP}" 2>&1
+    ) || rc=$?
 
-    rm -rf "${fake_bin}"
+    rm -rf -- "${fake_venv}"
+    trap - EXIT
 
     if [[ "${rc}" -eq 0 ]] \
-        && echo "${output}" | grep -q "WARN     python3 version 3.9 (ACE target: >= 3.12)"; then
+        && echo "${output}" | grep -q "WARN     python3 version 3.9 (ACE target: >= 3.12)" \
+        && echo "${output}" | grep -q "Python version: 3.9.0"; then
         report "warns but succeeds on version below 3.12" "${PASS}"
     else
         report "warns but succeeds on version below 3.12" "${FAIL}" "rc=${rc} output=${output}"
