@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.1
+# Version: 2.2
 
-# Updated: 2026-09-02
+# Updated: 2026-09-20
 
 # Status: Approved
 
@@ -80,63 +80,77 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Apply the reviewed Step 0.6 revisions (`scripts/bootstrap.sh`,
-`src/common/read_required_modules.py`,
-`src/common/read_required_dirs.py`) to the working tree, update the
-affected test files, run all required local and OCI verification, then
-commit.
+Decide and record the remaining scope of Step 0.6 (§2.1). The
+local-mode bootstrap revision is pushed and verified on Ubuntu and OCI,
+but Step 0.6 is not complete: items that `docs/phase0_foundation.md`
+still lists as open have not been planned.
 
 ## 2. Active work units
 
-### 2.1 Apply and test reviewed Step 0.6 revisions
+### 2.1 Step 0.6 — remaining scope after the local-mode revision
 
-Lifecycle status: `Agreed`
+Lifecycle status: `Proposed`
 
 Owner: Jan
 
 Support: Current assistant
 
-Reviewed content, not yet applied to the working tree:
+The reviewed local-mode revision (`scripts/bootstrap.sh` v1.10,
+`src/common/read_required_modules.py` v2.0,
+`src/common/read_required_dirs.py` v2.0, `config/required_modules.json`,
+and the revised tests) is pushed in `ccb04f9` and `bcf74ae` and passed
+all six suites on OCI. Its outcome is recorded in
+`docs/project_summary.md`.
 
-* `scripts/bootstrap.sh` (drafted as v1.9) — removes the
-  `TNS_ADMIN`-triggered `SNOMED_SYS_DB_PASSWORD` requirement (conflicts
-  with the approved Phase 0/1 Oracle boundary, §3.5); fixes a shell
-  code-injection vector in `check_python_modules` by passing the
-  module name as `sys.argv[1]` and importing via `importlib` instead
-  of interpolating into `-c` source; distinguishes `MISSING` from
-  `IMPORT FAILED`; hardens directory-path validation (exact `..`
-  component check, post-creation symlink-escape check against
-  `PROJECT_ROOT`); uses `${PYTHON}` consistently instead of bare
-  `python3`; adds `EXIT`-trap temp-file cleanup; adds the required
-  environment summary.
-* `src/common/read_required_modules.py` (drafted as v2.0) — adds
-  `--config PATH` for test isolation; validates `import_name` as a
-  valid dotted Python identifier (closes the injection surface at the
-  data source); rejects non-string, empty, whitespace-padded, or
-  comma/newline-containing values; rejects duplicate `import_name`;
-  separates load/validate/print for independent testability; validates
-  the complete registry before printing any entry.
-* `src/common/read_required_dirs.py` (drafted as v2.0) — adds
-  `--config PATH`; validates each entry as a safe relative path (no
-  leading `/`, no `..`/`.`/empty component, checked on the literal
-  string rather than via `PurePosixPath`, which silently normalizes
-  away the components being checked for); rejects ASCII control
-  characters (including NUL, which bash command substitution silently
-  drops) and DEL; rejects duplicates; separates load/validate/print.
+Step 0.6 itself remains `In progress` in `docs/phase0_foundation.md`.
+This unit records what that document still lists as open, so that scope
+is decided explicitly rather than by omission. No item below is
+approved yet.
 
-Approved next actions:
+Open items:
 
-1. Apply the three reviewed files to the working tree on Ubuntu.
-2. Update `tests/test_bootstrap_r3_sh.sh` and any other affected test
-   file to match the new interfaces: `--config` flag, `IMPORT FAILED`
-   vs `MISSING` distinction, removal of the `TNS_ADMIN`/SYS-password
-   check.
-3. Run all required local bootstrap tests.
-4. Run OCI verification.
-5. Review the diff, confirm commit-message prefix (`feat:` or `fix:`,
-   not `docs:` — this is a functional and security-relevant code
-   change).
-6. Commit and push.
+1. `--real-db` and the Phase 0 exit criteria. Phase 0 exit criterion 3
+   requires Step 0.6 to implement the approved `--real-db` behavior.
+   §4.1 agrees that `--real-db` waits on Phase 1 provisioning of the
+   `snomed` and `snomed_stage` schemas, and Phase 1 begins only after
+   Phase 0 closes. Both cannot hold. Either the exit criterion and the
+   Step 0.6 specification or the agreed sequencing must change. Not
+   resolved here.
+2. Bootstrap verification protocol. `docs/phase0_foundation.md` lists
+   it under Step 0.6 "Approved Outputs in Progress". It has not been
+   written and had no todo entry before this unit.
+3. Environment summary.
+   * Test coverage: only the `Mode:` line (`tests/test_bootstrap_r4_py.py`)
+     and the `Python version:` line
+     (`tests/test_bootstrap_r_py3_sh.sh`) are asserted. No test covers
+     the summary block as a whole, including the check-result lines
+     and the specification's rule that it must never display
+     passwords. Earlier sessions called this work "Round 5".
+   * Specification conformance: `docs/phase0_foundation.md` lists the
+     active configuration profile and the log directory among the
+     summary's example items. The current summary shows project root,
+     virtual environment, Python executable and version, mode, and
+     check results, but neither of those two.
+4. `docs/phase0_foundation.md` Step 0.6 section is out of date. Its
+   "Approved Outputs in Progress" still lists
+   `config/required_modules.json` and
+   `src/common/read_required_modules.py`, which are now committed. Its
+   "Current Outputs" does not list `tests/test_read_required_dirs_py.py`.
+5. §6.8 (isolated fixture-root redesign) remains deferred. Until it is
+   done, the bootstrap-level directory-safety checks (absolute path,
+   `..` component, symlink escape) are exercised only at the helper
+   level, not by a bootstrap-level test.
+
+Required action:
+
+* [ ] Decide item 1. It determines whether Step 0.6 can close under
+  the current Phase 0 exit criteria.
+* [ ] For items 2 and 3, decide whether to do the work within Step 0.6
+  or defer it explicitly under §6.
+* [ ] Update the Step 0.6 section of `docs/phase0_foundation.md` to
+  match the decisions (item 4).
+
+Approved next actions: none until the scope decision is made.
 
 ## 3. Decisions in force
 
@@ -215,8 +229,10 @@ Owner: Jan
 * The approved Phase 1 setup procedure determines privileged access.
 * This boundary was actively violated by the inherited
   `scripts/bootstrap.sh`'s `TNS_ADMIN`-triggered
-  `SNOMED_SYS_DB_PASSWORD` check; the reviewed revision (§2.1) removes
-  it.
+  `SNOMED_SYS_DB_PASSWORD` check. The check was removed in
+  `scripts/bootstrap.sh` v1.9 (`ccb04f9`), and
+  `tests/test_bootstrap_r4_py.py` carries a regression guard
+  (`oci_sys_db_password_not_required`).
 
 ## 4. Blockers and unresolved questions
 
@@ -231,8 +247,22 @@ Owner: Jan
 Support: Current assistant
 
 `--real-db` remains unimplemented in `scripts/bootstrap.sh`. Design
-requires reviewing the approved `db_connection.py` interface first —
-not done this session.
+requires reviewing the approved `db_connection.py` interface first.
+
+Agreed sequencing:
+
+* `--real-db` implementation waits on Phase 1 provisioning of the
+  `snomed` and `snomed_stage` schemas.
+* Only after provisioning does `--real-db` get implemented or
+  activated, using those two nonprivileged accounts.
+* `--real-db` verification must confirm each account connects and
+  executes a read-only query — nothing more privileged.
+* Until `--real-db` exists, any deployment-readiness verification
+  requiring actual Oracle connectivity must be performed separately,
+  outside this script, on OCI.
+
+This sequencing conflicts with Phase 0 exit criterion 3; see §2.1
+item 1.
 
 Required action:
 
@@ -247,27 +277,31 @@ Required action:
 
 Lifecycle status: `Agreed`
 
-Status modifier: `Blocked`
-
 Owner: Jan
 
-Earlier operational information identifies the OCI virtual environment
-as:
+Verification (2026-09-19): the precondition check of the OCI test
+wrapper found exactly one virtual-environment candidate:
 
 ```text
-wenv
+./wenv/bin/activate
 ```
 
-The production configuration reportedly identifies it as:
+The actual OCI virtual environment is therefore `wenv`.
 
-```text
-venv
-```
+`config/project.yaml` still declares a path ending in `/venv` for both
+the production environment (line 34) and the development environment
+(line 50). No reference to those values was found in
+`scripts/bootstrap.sh` or in `src/`, which identify the virtual
+environment through `VIRTUAL_ENV`. Other possible consumers were not
+checked.
 
 Required action:
 
-* [ ] Verify the actual OCI virtual-environment name and path before
-  changing configuration or documentation.
+* [ ] Decide how to reconcile the difference (change the production
+  configuration to `wenv`, rename the OCI virtual environment, or
+  document the difference), then apply and record the outcome.
+* [ ] Check for any other consumer of `paths.venv` before changing
+  configuration.
 
 ### 4.3 UZIS correspondence
 
@@ -342,6 +376,11 @@ Begin only after Step 0.6 is complete.
   claims.
 * [ ] Correct the inconsistent Python file-header example in
   `docs/conventions.md`.
+* [ ] Add the Python test invocation convention to
+  `docs/conventions.md`: run test files directly with
+  `python3 tests/<file>.py`, no pytest. The document currently states
+  the plain-python `_report`/`_summarise` pattern and "No pytest" but
+  not the invocation.
 * [ ] Check `docs/git_workflow.md` against the closed commit-prefix set
   in `docs/dev_workflow.md`.
 
@@ -491,6 +530,24 @@ Required action:
   into the ANTHEA repository (once confirmed reachable).
 * [ ] Remove `docs/ace_architecture.md` from the ACE repository once
   the ANTHEA transfer is confirmed.
+
+### 6.8 Isolated fixture-root redesign for bootstrap Round tests
+
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
+
+Owner: Jan
+
+Support: Current assistant
+
+`tests/test_bootstrap_r1_sh.sh` (and potentially other Round files) currently run against the real project tree because a temporary `config/directory_structure.yaml` override is not possible without patching. This is accepted for now, with real-tree mutations hardened (state-verified before mutating, restored immediately, backed by a suite-level EXIT trap) rather than eliminated.
+
+Deferred work:
+
+* [ ] Design and build an isolated fixture-root harness: a fresh temporary directory per test/fixture group, with `scripts/`, `src/common/`, and a controllable `config/` copied or symlinked in, so `directory_structure.yaml` can be overridden per test without touching the real repository at all.
+* [ ] Once the harness exists, extend Round 1 coverage to bootstrap's own independent directory-safety checks (not just the helper's): rejection of an absolute directory path, a `..` component, and a directory that resolves through a symlink escaping `PROJECT_ROOT` — security-relevant behavior introduced in the Step 0.6 revision that is not currently exercised at the bootstrap level, only at the helper level.
+* [ ] Once the harness exists, revisit whether the same isolation should extend to the other Round files still running against the real tree.
 
 ## 7. Rejected and superseded items
 
