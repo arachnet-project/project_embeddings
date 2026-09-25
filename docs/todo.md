@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.2
+# Version: 2.3
 
-# Updated: 2026-09-20
+# Updated: 2026-09-24
 
 # Status: Approved
 
@@ -109,13 +109,34 @@ approved yet.
 
 Open items:
 
-1. `--real-db` and the Phase 0 exit criteria. Phase 0 exit criterion 3
-   requires Step 0.6 to implement the approved `--real-db` behavior.
-   §4.1 agrees that `--real-db` waits on Phase 1 provisioning of the
-   `snomed` and `snomed_stage` schemas, and Phase 1 begins only after
-   Phase 0 closes. Both cannot hold. Either the exit criterion and the
-   Step 0.6 specification or the agreed sequencing must change. Not
-   resolved here.
+1. `--real-db` and the Phase 0 exit criteria — resolved. Exit
+   criterion 3 requires Step 0.6 to implement the approved `--real-db`
+   behavior. This is satisfied by design, implementation, and isolated
+   testing of both the unprovisioned-schema path (bootstrap explains
+   that the Phase 1 Oracle setup procedure must run first) and the
+   provisioned-schema connectivity path, verified against isolated
+   fixtures simulating successful connections and Oracle failures.
+   None of this requires real Oracle schemas to exist, and it can
+   proceed now.
+
+   Isolated tests demonstrate only that bootstrap handles simulated
+   outcomes correctly. They are not evidence that real application
+   schemas are reachable. Actual execution of `--real-db` against the
+   `snomed` and `snomed_stage` schemas occurs after those schemas are
+   provisioned by the approved Phase 1 setup procedure and is not
+   required to satisfy exit criterion 3.
+
+   Phase 0 exit criterion 7 separately concerns the available
+   real-Oracle evidence for the applicable Phase 0 components,
+   including explicit use of `SNOMED_TEST_REAL_DB=true` where
+   applicable; see §5.
+
+   Schema/user creation (`sys`, `CREATE USER`) stays out of Phase 0
+   and out of bootstrap in every case, per §3.5 and
+   `docs/phase0_foundation.md`'s Excluded Phase 0 Work list.
+
+   `docs/road_map.md` v1.3 confirms this boundary and the runtime
+   order agree with `docs/phase0_foundation.md`.
 2. Bootstrap verification protocol. `docs/phase0_foundation.md` lists
    it under Step 0.6 "Approved Outputs in Progress". It has not been
    written and had no todo entry before this unit.
@@ -143,8 +164,7 @@ Open items:
 
 Required action:
 
-* [ ] Decide item 1. It determines whether Step 0.6 can close under
-  the current Phase 0 exit criteria.
+* [x] Decide item 1 — resolved above.
 * [ ] For items 2 and 3, decide whether to do the work within Step 0.6
   or defer it explicitly under §6.
 * [ ] Update the Step 0.6 section of `docs/phase0_foundation.md` to
@@ -240,7 +260,7 @@ Owner: Jan
 
 Lifecycle status: `Agreed`
 
-Status modifier: `Blocked`
+Status modifier: `Blocked` only for real-schema verification
 
 Owner: Jan
 
@@ -249,20 +269,24 @@ Support: Current assistant
 `--real-db` remains unimplemented in `scripts/bootstrap.sh`. Design
 requires reviewing the approved `db_connection.py` interface first.
 
-Agreed sequencing:
+Design, implementation, and isolated testing of `--real-db` are not
+blocked and may proceed now against isolated fixtures simulating
+successful connections and Oracle failures.
 
-* `--real-db` implementation waits on Phase 1 provisioning of the
-  `snomed` and `snomed_stage` schemas.
-* Only after provisioning does `--real-db` get implemented or
-  activated, using those two nonprivileged accounts.
+Real-schema verification: `Blocked` pending Phase 1 provisioning of
+the `snomed` and `snomed_stage` schemas as nonprivileged accounts.
+
 * `--real-db` verification must confirm each account connects and
   executes a read-only query — nothing more privileged.
-* Until `--real-db` exists, any deployment-readiness verification
-  requiring actual Oracle connectivity must be performed separately,
-  outside this script, on OCI.
+* Isolated-fixture testing does not constitute evidence that real
+  schemas are reachable; only execution against real Oracle
+  schemas does.
+* Until real-schema verification is performed, any
+  deployment-readiness claim requiring actual Oracle connectivity
+  must be treated as unverified.
 
-This sequencing conflicts with Phase 0 exit criterion 3; see §2.1
-item 1.
+This item no longer conflicts with Phase 0 exit criterion 3; see
+§2.1 item 1.
 
 Required action:
 
