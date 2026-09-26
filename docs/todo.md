@@ -2,7 +2,7 @@
 
 # ACE — Todo
 
-# Version: 2.4
+# Version: 2.5
 
 # Updated: 2026-09-26
 
@@ -80,10 +80,11 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Decide and record the remaining scope of Step 0.6 (§2.1). The
-local-mode bootstrap revision is pushed and verified on Ubuntu and OCI,
-but Step 0.6 is not complete: items that `docs/phase0_foundation.md`
-still lists as open have not been planned.
+Review the approved `db_connection.py` interface, then design and
+implement `--real-db` in `scripts/bootstrap.sh` with its isolated
+tests (`docs/todo.md` §2.1, approved next action 1). The remaining
+Step 0.6 scope (§2.1 items 1-4) was decided this session; local-mode
+bootstrap remains pushed and verified on Ubuntu and OCI.
 
 ## 2. Active work units
 
