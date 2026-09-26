@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.3
+# Version: 2.4
 
-# Updated: 2026-09-24
+# Updated: 2026-09-26
 
 # Status: Approved
 
@@ -137,26 +137,27 @@ Open items:
 
    `docs/road_map.md` v1.3 confirms this boundary and the runtime
    order agree with `docs/phase0_foundation.md`.
-2. Bootstrap verification protocol. `docs/phase0_foundation.md` lists
-   it under Step 0.6 "Approved Outputs in Progress". It has not been
-   written and had no todo entry before this unit.
-3. Environment summary.
-   * Test coverage: only the `Mode:` line (`tests/test_bootstrap_r4_py.py`)
-     and the `Python version:` line
-     (`tests/test_bootstrap_r_py3_sh.sh`) are asserted. No test covers
-     the summary block as a whole, including the check-result lines
-     and the specification's rule that it must never display
-     passwords. Earlier sessions called this work "Round 5".
-   * Specification conformance: `docs/phase0_foundation.md` lists the
-     active configuration profile and the log directory among the
-     summary's example items. The current summary shows project root,
-     virtual environment, Python executable and version, mode, and
-     check results, but neither of those two.
-4. `docs/phase0_foundation.md` Step 0.6 section is out of date. Its
-   "Approved Outputs in Progress" still lists
-   `config/required_modules.json` and
-   `src/common/read_required_modules.py`, which are now committed. Its
-   "Current Outputs" does not list `tests/test_read_required_dirs_py.py`.
+2. Bootstrap verification protocol — scope decided. Stays within
+   Step 0.6, per `docs/phase0_foundation.md`'s "Approved Outputs in
+   Progress" listing. Sequenced after `--real-db` implementation
+   (§2.1 item 1) is complete, so the protocol documents stable,
+   finished bootstrap behavior rather than being written twice.
+3. Environment summary — scope split and decided.
+
+   * Test coverage ("Round 5"): stays within Step 0.6. It must cover
+     the summary block as a whole, including the check-result lines,
+     and verify that passwords or other credential values are never
+     displayed. Local-mode coverage may proceed independently;
+     real-database-mode summary coverage must be included with the
+     isolated `--real-db` tests from item 1.
+   * Specification conformance: whether to add the active
+     configuration profile and log directory—listed as examples,
+     rather than mandatory keys—is deferred to §6.1's Step 0.7
+     integration and conformance audit. This does not block completion
+     of Step 0.6.
+4. `docs/phase0_foundation.md` Step 0.6 section — updated. Its Current
+   Outputs and Approved Outputs in Progress lists now reflect the
+   committed files and the remaining Step 0.6 work.
 5. §6.8 (isolated fixture-root redesign) remains deferred. Until it is
    done, the bootstrap-level directory-safety checks (absolute path,
    `..` component, symlink escape) are exercised only at the helper
@@ -165,12 +166,19 @@ Open items:
 Required action:
 
 * [x] Decide item 1 — resolved above.
-* [ ] For items 2 and 3, decide whether to do the work within Step 0.6
-  or defer it explicitly under §6.
-* [ ] Update the Step 0.6 section of `docs/phase0_foundation.md` to
-  match the decisions (item 4).
+* [x] Decide items 2 and 3 — resolved above.
+* [x] Update the Step 0.6 section of `docs/phase0_foundation.md` to
+  match the decisions (item 4) — applied.
 
-Approved next actions: none until the scope decision is made.
+Approved next actions, in order:
+
+1. Review the approved `db_connection.py` interface, then design and
+   implement `--real-db` in `scripts/bootstrap.sh` with its isolated
+   tests (item 1).
+2. Add environment-summary test coverage, local mode and
+   real-database mode ("Round 5") (item 3).
+3. Write the bootstrap verification protocol (item 2).
+4. Proceed to §6.1 (Step 0.7) once Step 0.6 closes.
 
 ## 3. Decisions in force
 
@@ -407,6 +415,9 @@ Begin only after Step 0.6 is complete.
   not the invocation.
 * [ ] Check `docs/git_workflow.md` against the closed commit-prefix set
   in `docs/dev_workflow.md`.
+* [ ] Decide during the environment-summary conformance review
+  whether the active configuration profile and log directory should
+  be added to the summary.
 
 ### 6.2 Repository maintenance
 

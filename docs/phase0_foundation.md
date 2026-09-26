@@ -4,8 +4,8 @@
 
 **Project:** Arachnet Clinical Embeddings
 **Owner:** Jan Mura, Arachnet Project z.s.
-**Document version:** 1.9
-**Date:** 2026-08-27
+**Document version:** 1.10
+**Date:** 2026-09-26
 **Status:** In progress
 
 ---
@@ -403,19 +403,24 @@ implementation.
 ### Current Outputs
 
 - `scripts/bootstrap.sh`
+- `config/required_modules.json`
+- `src/common/read_required_modules.py`
+- `src/common/read_required_dirs.py`
 - `tests/test_bootstrap_r1_sh.sh`
 - `tests/test_bootstrap_r2_sh.sh`
 - `tests/test_bootstrap_r3_sh.sh`
 - `tests/test_bootstrap_r4_py.py`
 - `tests/test_bootstrap_r_py3_sh.sh`
+- `tests/test_read_required_dirs_py.py`
 
 ### Approved Outputs in Progress
 
-- `config/required_modules.json`
-- `src/common/read_required_modules.py`
-- Revised or additional isolated bootstrap tests required by the
-  approved behavior.
-- A bootstrap verification protocol.
+- `--real-db` implementation in `scripts/bootstrap.sh` and its
+  isolated tests (`docs/todo.md` §2.1 item 1).
+- Environment-summary test coverage, local and real-database mode,
+  "Round 5" (`docs/todo.md` §2.1 item 3).
+- A bootstrap verification protocol, sequenced after `--real-db`
+  (`docs/todo.md` §2.1 item 2).
 
 ### Relationship to Earlier Steps
 
