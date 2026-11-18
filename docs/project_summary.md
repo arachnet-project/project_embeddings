@@ -1,10 +1,9 @@
 # ARC_FILE: docs/project_summary.md
-
 # ACE — Project Summary
 
-**Updated:** 2026-09-26
-**Session closed:** 2026-09-26, when the commit containing this summary is pushed
-**Prepared by:** Claude, reviewed by Jan Mura before commit
+**Updated:** 2026-11-17
+**Session close-out:** Approved; completion pending commit, push, and verification
+**Prepared by:** Current assistant; approved by Jan Mura
 **Current phase:** Phase 0 — Foundation and Infrastructure
 **Phase status:** In progress
 
@@ -12,106 +11,77 @@
 
 ## Project context
 
-Arachnet Clinical Embeddings is a SNOMED CT clinical terminology
-embedding and semantic-search project using Oracle, Python, and Bash.
+Arachnet Clinical Embeddings (ACE) is a SNOMED CT terminology and semantic-search project using Oracle, Python, and Bash. It is owned by Arachnet Project z.s. and developed by Jan Mura. ANTHEA is the parallel theoretical project.
 
-It is owned by Arachnet Project z.s. and developed by Jan Mura.
-
-ANTHEA is the parallel theoretical and research project.
-
-The current project objective remains completion and formal close-out
-of Phase 0 before Phase 1 implementation begins.
+The current repository plan is governed by docs/dev_workflow.md and docs/todo.md. The interrupted Step 0.6 --real-db work remains active in docs/todo.md. The UZIS workshop vocabulary work was recorded ahead of it as work unit §2.0.
 
 ## Scope of this summary
 
-This summary covers the session that decided the full remaining scope
-of Step 0.6 (`docs/todo.md` §2.1, items 1 through 4), following the
-previous close-out at commit `b012d5a` (2026-09-20).
+This summary records the 2026-11-17 work to prepare docs/snomed_vocabulary.md for the UZIS SNOMED CT implementation workshop scheduled for 2026-11-23.
 
-## State inherited at session start
+## State inherited at the start of the work
 
-Repository: `/home/jan/project_embeddings` on Ubuntu, branch `main`,
-at `b012d5a`, clean, aligned with `origin/main`. Step 0.6's remaining
-scope (`todo.md` §2.1) was `Proposed` and undecided.
+According to Jan’s repository check, the repository was /home/jan/project_embeddings on Ubuntu, on branch main, at commit 0a85bef, clean and aligned with origin/main. Jan confirms no repository changes have occurred since that check other than the vocabulary and todo edits recorded below. The previous project summary described the last formally closed session as 2026-09-26. The todo recorded the interrupted 2026-10-09 --real-db design session as the immediate focus.
 
 ## Work completed
 
-### §2.1 item 1 and §4.1 — `--real-db` unblocked
+### SNOMED CT vocabulary
 
-Commit `be07afa`, `docs:`:
+docs/snomed_vocabulary.md was updated from version 0.4 to version 0.5, dated 2026-11-17. It contains the reviewed glossary entries for SNOMED CT concepts, descriptions, expressions, relationships, reference sets, and the Machine Readable Concept Model (MRCM).
 
-* `--real-db` design, implementation, and isolated testing are no
-  longer blocked by Phase 1 schema provisioning. Only real-schema
-  verification (execution against actual Oracle schemas, for exit
-  criterion 7) remains blocked.
-* Schema/user creation stays out of Phase 0 and bootstrap in every
-  case, per §3.5.
-* Verified: `docs/road_map.md` v1.3 agrees with
-  `docs/phase0_foundation.md` on the Phase 0/Phase 1 Oracle boundary.
+The Attribute entry identifies an attribute as a concept representing a characteristic used to define or refine another concept or expression. Jan approved the vocabulary diff, including the flat entry structure with the previous broad section headings removed.
 
-### §2.1 items 2, 3, 4 and §6.1 — remaining Step 0.6 scope decided
+### Todo
 
-Commit `97bf3ed`, `docs:`:
-
-* Item 2 (bootstrap verification protocol): stays in Step 0.6,
-  sequenced after `--real-db` implementation.
-* Item 3 (environment summary): split. Test coverage ("Round 5",
-  covering the summary block as a whole, check-result lines, and
-  credential-safety in both local and real-database mode) stays in
-  Step 0.6. Spec-conformance additions (active configuration profile,
-  log directory — both example items, not mandatory) deferred to
-  §6.1's Step 0.7 audit, with a corresponding backlog line added there.
-* Item 4: `docs/phase0_foundation.md` Step 0.6 output lists reconciled
-  with committed files (including the previously unlisted
-  `src/common/read_required_dirs.py` and its test), bumped to v1.10.
+docs/todo.md was updated from version 2.6 to version 2.7, dated 2026-11-17. It adds work unit §2.0 for the UZIS vocabulary update, places that work before resumption of the interrupted --real-db work, and records the review and repository submission actions.
 
 ## Decisions approved
 
-* The four `todo.md` §2.1 items are resolved; no open scope question
-  remains for Step 0.6.
-* Approved next actions, in order: review `db_connection.py`'s
-  interface; design and implement `--real-db` with isolated tests;
-  add environment-summary test coverage; write the bootstrap
-  verification protocol.
-* Versioning convention adopted this session: `todo.md` bumps on
-  material change; `phase0_foundation.md` bumps like a `feat`-sized
-  change.
+* Jan approved the vocabulary and todo diffs for repository submission.
+* The vocabulary keeps the reviewed entry order in a flat glossary structure.
+* After the vocabulary work, the current todo focus returns to the interrupted --real-db design unless Jan revises the plan.
+* Further UZIS workshop preparation, including a concise ACE explanation, workshop questions, and possible worked examples, remains separate from the vocabulary update. It has not yet been added as an approved todo work unit.
 
 ## Verification performed
 
-Documentation-only session; no code or tests were touched, so no test
-suite applies. Both commits were reviewed against the live file
-content and Git status before being made.
+This was documentation-only work. No code or tests were changed or run.
 
-## Repository state at session close
+The update script reported changes only to docs/snomed_vocabulary.md and docs/todo.md. Its git diff --check step produced no whitespace errors. Jan supplied the resulting diffs; the assistant reviewed them, and Jan approved both documents.
 
-Local `HEAD` and `origin/main` will be aligned at the commit
-containing this summary, once pushed. Before this close-out commit,
-`HEAD` was `97bf3ed`, two commits ahead of the `origin/main` state
-inherited at session start (`b012d5a`).
+## Repository state at close-out preparation
 
-The close-out commit contains exactly:
+The latest user-provided status output was:
+
+    ## main...origin/main
+     M docs/snomed_vocabulary.md
+     M docs/todo.md
+
+The earlier repository check reported HEAD 0a85bef and alignment with origin/main. Jan confirms no other repository work has occurred since that check. No commit or push for this documentation work has been reported.
+
+The project-summary file was prepared outside the working tree for review. The close-out change is intended to contain exactly:
 
     docs/project_summary.md
+    docs/snomed_vocabulary.md
     docs/todo.md
+
+Verify the exact staged diff before committing. After pushing, verify that the working tree is clean and local HEAD is aligned with origin/main. The session is formally closed only after that verification.
 
 ## Preserved working-tree changes
 
-None. The working tree was clean throughout this session; both
-substantive commits (`be07afa`, `97bf3ed`) were made from a clean
-state.
+The following approved, uncommitted changes are intentional and must be preserved until committed:
 
-## Unresolved issues
+* docs/snomed_vocabulary.md
+* docs/todo.md
 
-Unchanged from the previous summary — `--real-db` mode design
-(now unblocked for implementation), OCI virtual-environment naming,
-UZIS correspondence, Step 0.5 real-Oracle evidence, and the §6
-backlog — plus one new backlog line: whether to add the active
-configuration profile and log directory to the environment summary
-(§6.1), to be decided during the Step 0.7 conformance review.
+At the latest reported repository status, no other working-tree changes were present. The project-summary file remains outside the working tree until it is copied into the repository.
+
+## Unresolved issues and pending work
+
+* The close-out commit and push have not yet occurred.
+* The latest prior project summary listed the OCI virtual-environment discrepancy, UZIS correspondence, Step 0.5 real-Oracle evidence, and the §6 backlog as unresolved. Their current details remain in docs/todo.md and should be checked during the next work.
+* The next action after close-out is to resume the interrupted --real-db design, as recorded in docs/todo.md. If Jan chooses to prioritize additional UZIS workshop preparation, record that plan change and work unit in the todo first.
+* Any worked examples should be checked against authoritative SNOMED CT sources.
 
 ## Immediate next step
 
-Start a new session. Review `db_connection.py`'s approved interface,
-then design and implement `--real-db` in `scripts/bootstrap.sh` with
-its isolated tests (`docs/todo.md` §2.1, approved next action 1).
+Copy this approved summary into docs/project_summary.md on Ubuntu. Review the staged diffs for all three documentation files, commit and push the approved documentation changes from Ubuntu, then verify the final repository state. Close the session only after the push and verification succeed.

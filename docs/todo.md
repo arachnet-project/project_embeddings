@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.6
+# Version: 2.7
 
-# Updated: 2026-10-09
+# Updated: 2026-11-17
 
 # Status: Approved
 
@@ -80,7 +80,8 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Resume the interrupted session of 2026-10-09: finish deciding the
+Complete and review the UZIS workshop vocabulary update in §2.0,
+then resume the interrupted session of 2026-10-09: finish deciding the
 `--real-db` design in §2.2 (decisions A–C, D3–D8), then implement it
 with its isolated tests.
 
@@ -95,6 +96,26 @@ On resumption: run the normal session opening (`dev_workflow.md` §4),
 then read §2.2 in full before continuing.
 
 ## 2. Active work units
+
+### 2.0 UZIS workshop — SNOMED CT vocabulary update
+
+Lifecycle status: `Applied`
+
+Owner: Jan
+
+Support: Current assistant
+
+The reviewed UZIS workshop vocabulary has been applied to
+`docs/snomed_vocabulary.md`. Final diff review and repository
+submission remain pending.
+
+Approved next actions:
+
+1. Review the diffs for `docs/snomed_vocabulary.md` and
+   `docs/todo.md`.
+2. Resolve any corrections found during that review.
+3. After approval, commit and push the approved documentation changes
+   from Ubuntu.
 
 ### 2.1 Step 0.6 — remaining scope after the local-mode revision
 
