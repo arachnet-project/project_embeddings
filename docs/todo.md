@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.7
+# Version: 2.8
 
-# Updated: 2026-11-17
+# Updated: 2026-11-24
 
 # Status: Approved
 
@@ -80,42 +80,24 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Complete and review the UZIS workshop vocabulary update in §2.0,
-then resume the interrupted session of 2026-10-09: finish deciding the
-`--real-db` design in §2.2 (decisions A–C, D3–D8), then implement it
-with its isolated tests.
+Complete the post-workshop control-document close-out: review the
+updated `docs/project_summary.md` and `docs/todo.md` against the
+development workflow, commit and push them from Ubuntu, and verify the
+resulting repository state.
 
-Session state: the 2026-10-09 session was interrupted, not closed
-(`docs/dev_workflow.md` §11). `docs/project_summary.md` therefore
-still describes the last closed session (2026-09-26, `5d652db`) and
-was deliberately not updated. No code was changed. The only commit of
-the interrupted session is the one containing this version of
-`docs/todo.md`.
+After close-out, resume the interrupted 2026-10-09 `--real-db`
+design in §2.2, resolve the remaining decisions, and complete the
+agreed Step 0.6 work in §2.1. UZIS follow-up in §4.3 and Phase 1
+ingestion planning in §6.9 do not block Phase 0 engineering.
 
-On resumption: run the normal session opening (`dev_workflow.md` §4),
-then read §2.2 in full before continuing.
+Session state: the 2026-10-09 `--real-db` design session was
+interrupted, not closed (`docs/dev_workflow.md` §11). The SNOMED CT
+vocabulary update was subsequently committed in `584045f`. At the
+2026-11-24 repository check, `main` was clean and aligned with
+`origin/main`. The post-workshop control-document changes are
+the current close-out work.
 
 ## 2. Active work units
-
-### 2.0 UZIS workshop — SNOMED CT vocabulary update
-
-Lifecycle status: `Applied`
-
-Owner: Jan
-
-Support: Current assistant
-
-The reviewed UZIS workshop vocabulary has been applied to
-`docs/snomed_vocabulary.md`. Final diff review and repository
-submission remain pending.
-
-Approved next actions:
-
-1. Review the diffs for `docs/snomed_vocabulary.md` and
-   `docs/todo.md`.
-2. Resolve any corrections found during that review.
-3. After approval, commit and push the approved documentation changes
-   from Ubuntu.
 
 ### 2.1 Step 0.6 — remaining scope after the local-mode revision
 
@@ -127,20 +109,21 @@ Support: Current assistant
 
 The reviewed local-mode revision (`scripts/bootstrap.sh` v1.10,
 `src/common/read_required_modules.py` v2.0,
-`src/common/read_required_dirs.py` v2.0, `config/required_modules.json`,
-and the revised tests) is pushed in `ccb04f9` and `bcf74ae` and passed
-all six suites on OCI. Its outcome is recorded in
-`docs/project_summary.md`.
+`src/common/read_required_dirs.py` v2.0,
+`config/required_modules.json`, and the revised tests) is pushed in
+`ccb04f9` and `bcf74ae` and passed all six suites on OCI.
+Its outcome is recorded in `docs/project_summary.md`.
 
-Step 0.6 itself remains `In progress` in `docs/phase0_foundation.md`.
-All scope items below were decided in the 2026-09-26 session.
+Step 0.6 itself remains `In progress` in
+`docs/phase0_foundation.md`. All scope items below were decided in
+the 2026-09-26 session.
 
 Items:
 
 1. `--real-db` and the Phase 0 exit criteria — resolved. Exit
-   criterion 3 requires Step 0.6 to implement the approved `--real-db`
-   behavior. This is satisfied by design, implementation, and isolated
-   testing of both the unprovisioned-schema path and the
+   criterion 3 requires Step 0.6 to implement the approved
+   `--real-db` behavior. This is satisfied by design, implementation,
+   and isolated testing of both the unprovisioned-schema path and the
    provisioned-schema connectivity path, verified against isolated
    fixtures simulating successful connections and Oracle failures.
    None of this requires real Oracle schemas to exist, and it can
@@ -156,18 +139,18 @@ Items:
 
    Isolated tests demonstrate only that bootstrap handles simulated
    outcomes correctly. They are not evidence that real application
-   schemas are reachable. Actual execution of `--real-db` against the
-   `snomed` and `snomed_stage` schemas occurs after those schemas are
-   provisioned by the approved Phase 1 setup procedure and is not
-   required to satisfy exit criterion 3.
+   schemas are reachable. Actual execution of `--real-db` against
+   the `snomed` and `snomed_stage` schemas occurs after those
+   schemas are provisioned by the approved Phase 1 setup procedure and
+   is not required to satisfy exit criterion 3.
 
    Phase 0 exit criterion 7 separately concerns the available
    real-Oracle evidence for the applicable Phase 0 components,
    including explicit use of `SNOMED_TEST_REAL_DB=true` where
    applicable; see §5.
 
-   Schema/user creation (`sys`, `CREATE USER`) stays out of Phase 0
-   and out of bootstrap in every case, per §3.5 and
+   Schema/user creation (`sys`, `CREATE USER`) stays out of
+   Phase 0 and out of bootstrap in every case, per §3.5 and
    `docs/phase0_foundation.md`'s Excluded Phase 0 Work list.
 
    `docs/road_map.md` v1.3 confirms this boundary and the runtime
@@ -179,8 +162,8 @@ Items:
    check-result lines, and verify that credential values are never
    displayed. Local-mode coverage may proceed independently;
    real-database-mode summary coverage is included with the isolated
-   `--real-db` tests. Specification conformance (active configuration
-   profile, log directory) is deferred to §6.1.
+   `--real-db` tests. Specification conformance (active
+   configuration profile, log directory) is deferred to §6.1.
 4. `docs/phase0_foundation.md` Step 0.6 section — updated (v1.10).
 5. §6.8 (isolated fixture-root redesign) remains deferred. Until it is
    done, the bootstrap-level directory-safety checks are exercised
@@ -188,10 +171,10 @@ Items:
 
 Approved next actions, in order:
 
-1. Review the approved `db_connection.py` interface, then design and
-   implement `--real-db` in `scripts/bootstrap.sh` with its isolated
-   tests (item 1). In progress: review performed, design under
-   decision in §2.2.
+1. Review the approved `db_connection.py` interface, then design
+   and implement `--real-db` in `scripts/bootstrap.sh` with its
+   isolated tests (item 1). In progress: review performed, design
+   under decision in §2.2.
 2. Add environment-summary test coverage, local mode and
    real-database mode ("Round 5") (item 3).
 3. Write the bootstrap verification protocol (item 2).
@@ -207,22 +190,22 @@ Support: Current assistant
 
 #### 2.2.1 Session-opening verification (2026-10-09)
 
-Repository `/home/jan/project_embeddings` on Ubuntu, branch `main`,
-`HEAD` `5d652db` (the 2026-09-26 close-out commit), clean, aligned
-with `origin/main` (0 ahead, 0 behind). Matches
-`docs/project_summary.md`. `docs/git_workflow.md` v1.2 (2026-04-10)
-still exists; its relationship to the closed commit-prefix set
-remains deferred per §3.4.
+Repository `/home/jan/project_embeddings` on Ubuntu, branch
+`main`, HEAD `5d652db` (the 2026-09-26 close-out commit),
+clean, aligned with `origin/main` (0 ahead, 0 behind). Matches
+`docs/project_summary.md`. `docs/git_workflow.md` v1.2
+(2026-04-10) still exists; its relationship to the closed
+commit-prefix set remains deferred per §3.4.
 
 Files reviewed this session: `docs/dev_workflow.md` v2.2,
 `docs/project_summary.md`, `docs/conventions.md` v1.6,
 `docs/todo.md` v2.5, `src/common/db_connection.py` v1.6,
 `config/database.yaml` (config_version 1.4),
-`scripts/bootstrap.sh` v1.10, `docs/phase0_foundation.md` Step 0.6
-section, `src/common/read_required_modules.py` v2.0,
+`scripts/bootstrap.sh` v1.10, `docs/phase0_foundation.md`
+Step 0.6 section, `src/common/read_required_modules.py` v2.0,
 `src/common/exceptions.py`, `src/common/logger.py`,
-`src/common/config_loader.py` 0.4.0, `tests/test_bootstrap_r4_py.py`
-v1.3.
+`src/common/config_loader.py` 0.4.0,
+`tests/test_bootstrap_r4_py.py` v1.3.
 
 #### 2.2.2 Material departure from plan
 
@@ -234,76 +217,79 @@ Round 4 OCI tests. Recorded per `dev_workflow.md` §6.
 
 1. `test_connection(cfg, schema)` fits §4.1 unchanged: connects with
    autocommit off, runs `SELECT 1 FROM DUAL`, no commit or DML,
-   closes. Raises `SnomedConfigError` or `SnomedDBConnectionError`.
-2. It accepts `"sys"` and silently switches to SYSDBA. The bootstrap
-   helper must hardcode exactly `snomed` and `snomed_stage` and never
-   take a schema name from input; a test must guard this.
+   closes. Raises `SnomedConfigError` or
+   `SnomedDBConnectionError`.
+2. It accepts `sys` and silently switches to SYSDBA. The bootstrap
+   helper must hardcode exactly `snomed` and `snomed_stage`
+   and never take a schema name from input; a test must guard this.
 3. ORA-01017 is returned for both a nonexistent user and a wrong
    password, so "unprovisioned" cannot be distinguished (see
    decision C).
 4. `get_connection` does not chain its final exception (no
-   `from last_exc`), contrary to `docs/conventions.md`. The Oracle
-   code is available only in `exc.detail` text, which by the
-   `exceptions.py` convention carries it (e.g. `ORA-12541`).
+   `from last_exc`), contrary to `docs/conventions.md`. The
+   Oracle code is available only in `exc.detail` text, which by
+   the `exceptions.py` convention carries it (e.g. ORA-12541).
 5. Every connection is retried once after 2 seconds. A wrong password
    causes two failed logons per schema per run
    (`FAILED_LOGIN_ATTEMPTS` lockout risk); an unreachable host costs
    tens of seconds per schema.
 6. Credential safety is sound: passwords are never logged or put in
    exception detail.
-7. Thin mode resolves `tns_alias` through `$TNS_ADMIN/tnsnames.ora`.
-   Jan verified (2026-10-09) that python-oracledb 2.1.2 supports
-   `TNS_ADMIN` in Thin mode; the earlier hypothesis that it did not
-   was wrong and is withdrawn. It does not explain the §5 evidence
-   gap.
-8. Isolated testing is feasible with a fake `oracledb` package first
-   on `PYTHONPATH` in a temporary directory.
+7. Thin mode resolves `tns_alias` through
+   `$TNS_ADMIN/tnsnames.ora`. Jan verified (2026-10-09) that
+   python-oracledb 2.1.2 supports `TNS_ADMIN` in Thin mode; the
+   earlier hypothesis that it did not was wrong and is withdrawn. It
+   does not explain the §5 evidence gap.
+8. Isolated testing is feasible with a fake `oracledb` package
+   first on `PYTHONPATH` in a temporary directory.
 
 Further facts from the other reviewed files:
 
-* `logger.py`: importing `db_connection` attaches root handlers to
-  stdout and to `$SNOMED_LOG_DIR/snomed.log`. `db_connection`'s INFO
-  and WARNING lines therefore appear on the helper's stdout, and every
-  run appends to the real log (tests must use a temporary
-  `SNOMED_LOG_DIR`).
-* `exceptions.py`: `SnomedDBConnectionError.exit_code` is 2; bootstrap
-  must map every failure to exit 1 (spec allows only 0 and 1).
-* `config_loader.py`: raises plain `FileNotFoundError`, `ValueError`,
-  `IOError`, `KeyError` and OmegaConf errors, not `SnomedConfigError`.
-  The helper must catch configuration failures broadly. No
-  import-time side effects.
+* `logger.py`: importing `db_connection` attaches root
+  handlers to stdout and to `$SNOMED_LOG_DIR/snomed.log`.
+  `db_connection`'s INFO and WARNING lines therefore appear on the
+  helper's stdout, and every run appends to the real log (tests must
+  use a temporary `SNOMED_LOG_DIR`).
+* `exceptions.py`: `SnomedDBConnectionError.exit_code` is 2;
+  bootstrap must map every failure to exit 1 (spec allows only 0 and
+  1).
+* `config_loader.py`: raises plain `FileNotFoundError`,
+  `ValueError`, `IOError`, `KeyError` and OmegaConf
+  errors, not `SnomedConfigError`. The helper must catch
+  configuration failures broadly. No import-time side effects.
 * `tests/test_bootstrap_r4_py.py`: currently asserts that local mode
-  with `TNS_ADMIN` set requires both application passwords and prints
-  "Mode: OCI/production". Affected by D1.
+  with `TNS_ADMIN` set requires both application passwords and
+  prints "Mode: OCI/production". Affected by D1.
 
 #### 2.2.4 Decision ledger
 
-A — Use `test_connection` unchanged; no edits to `db_connection.py`;
-extract the ORA/DPY code from `exc.detail`; record the missing
-exception chaining in §6.1. Status: `Proposed`, awaiting Jan.
+A — Use `test_connection` unchanged; no edits to
+`db_connection.py`; extract the ORA/DPY code from `exc.detail`;
+record the missing exception chaining in §6.1. Status: `Proposed`,
+awaiting Jan.
 
 B — Accept the retry's lockout and timeout behavior; document it in
 the bootstrap verification protocol rather than change it. Status:
 `Proposed`, awaiting Jan.
 
 C — Reword the "unprovisioned schema" requirement in §2.1 item 1 and
-in `docs/phase0_foundation.md` per finding 3. Status: `Proposed`,
-awaiting Jan.
+in `docs/phase0_foundation.md` per finding 3. Status:
+`Proposed`, awaiting Jan.
 
 D1 — Mode model aligned with the spec. Exactly two bootstrap modes:
 local (default) and real-db (`--real-db`). `TNS_ADMIN` no longer
 changes what local mode checks; it becomes a real-db precondition.
 Summary prints "Mode: local" or "Mode: real-db". Fixes the current
 violation of the spec rule that local mode must not require
-application-schema passwords. Round 4 OCI tests to be rewritten; a new
-test guards that local mode passes with `TNS_ADMIN` set and no
+application-schema passwords. Round 4 OCI tests to be rewritten; a
+new test guards that local mode passes with `TNS_ADMIN` set and no
 passwords. Status: `Agreed` (2026-10-09).
 
 D2 — Flow. All local checks run first, unchanged; then
 `check_real_db`. Bash requires `TNS_ADMIN` set to an existing
-directory and `$TNS_ADMIN/tnsnames.ora` readable; client `sqlnet.ora`
-is not required (Thin mode does not read it). New helper
-`src/common/check_db_connectivity.py`:
+directory and `$TNS_ADMIN/tnsnames.ora` readable; client
+`sqlnet.ora` is not required (Thin mode does not read it). New
+helper `src/common/check_db_connectivity.py`:
 
 * hardcoded `SCHEMAS = ("snomed", "snomed_stage")`, no schema
   argument;
@@ -314,18 +300,18 @@ is not required (Thin mode does not read it). New helper
 * call `test_connection` per schema, continuing after a failure;
 * return the TNS alias for the summary.
 
-The `database.yaml` comment is to be corrected (in the D8 `docs:`
-commit) to: "`tnsnames.ora` is required for ACE's python-oracledb
-Thin-mode alias resolution. Thin mode does not read `sqlnet.ora`; that
-file may still be used by Oracle Client/Thick-mode tools involved in
-Phase 1 provisioning." Status: `Agreed` (2026-10-09, as amended by
-Jan).
+The `database.yaml` comment is to be corrected (in the D8
+`docs:` commit) to: "`tnsnames.ora` is required for ACE's
+python-oracledb Thin-mode alias resolution. Thin mode does not read
+`sqlnet.ora`; that file may still be used by Oracle Client/Thick-mode
+tools involved in Phase 1 provisioning." Status: `Agreed`
+(2026-10-09, as amended by Jan).
 
 D3 — Output channel. Helper writes result records to a
 `--result-file` (mktemp, registered in `TEMP_FILES`); helper
-stdout/stderr (log lines) captured to another temporary file and
-shown only on failure. Alternative considered: prefixed record lines
-on stdout. Status: `Proposed`, awaiting Jan.
+stdout/stderr (log lines) captured to another temporary file and shown
+only on failure. Alternative considered: prefixed record lines on
+stdout. Status: `Proposed`, awaiting Jan.
 
 D4 — Per-schema classification, printing only the code plus a fixed
 hint, never raw Oracle text:
@@ -351,15 +337,16 @@ D5 — Real-db summary adds "Oracle connection identifier: ARADB",
 credential values. Status: `Proposed`, awaiting Jan.
 
 D6 — Isolated tests at two levels. Helper-level: direct invocation
-with `--config-dir` fixtures. Bootstrap-level: fake `oracledb`
-package in a mkdtemp directory first on `PYTHONPATH`, behavior per
-schema set by a control variable (OK, 01017, 28000, 3001, 6000,
-12541, other); the fake provides `connect`, `DatabaseError`,
-`AUTH_MODE_SYSDBA` and a `Connection` class, and records every call
-so tests assert: only `snomed` and `snomed_stage` connected, SYSDBA
-never requested, only `SELECT 1 FROM DUAL` executed, nothing
-committed. `SNOMED_LOG_DIR` is a mkdtemp directory. Sentinel password
-values must never appear in stdout or stderr. Status: `Proposed`,
+with `--config-dir` fixtures. Bootstrap-level: fake
+`oracledb` package in a mkdtemp directory first on `PYTHONPATH`,
+behavior per schema set by a control variable (OK, 01017, 28000, 3001,
+6000, 12541, other); the fake provides `connect`,
+`DatabaseError`, `AUTH_MODE_SYSDBA` and a `Connection`
+class, and records every call so tests assert: only `snomed` and
+`snomed_stage` connected, SYSDBA never requested, only
+`SELECT 1 FROM DUAL` executed, nothing committed.
+`SNOMED_LOG_DIR` is a mkdtemp directory. Sentinel password values
+must never appear in stdout or stderr. Status: `Proposed`,
 awaiting Jan.
 
 D7 — Round numbering. Open question: `--real-db` tests as
@@ -368,37 +355,37 @@ coverage), or as r5 with summary coverage moved to r6. Status:
 `Proposed`, awaiting Jan.
 
 D8 — Commits, in order: (1) `fix:` D1 local-mode correction plus
-rewritten Round 4; (2) `feat:` `--real-db`, `bootstrap.sh` v1.11, the
-helper and its tests; (3) `docs:` decision C wording,
-`database.yaml` comment, new §6.1 items. Before the first of these,
-check `docs/git_workflow.md` against the closed prefix set. Status:
-`Proposed`, awaiting Jan.
+rewritten Round 4; (2) `feat:` `--real-db`,
+`bootstrap.sh` v1.11, the helper and its tests; (3) `docs:`
+decision C wording, `database.yaml` comment, new §6.1 items.
+Before the first of these, check `docs/git_workflow.md` against the
+closed prefix set. Status: `Proposed`, awaiting Jan.
 
 #### 2.2.5 `bootstrap.sh` changes implied by D1–D5
 
-* `main`: accept `--real-db` alongside `-h`/`--help`; a script-scoped
-  mode variable replaces `TNS_ADMIN` as the source of truth for mode
-  (the existing code comment says the opposite and must be
-  rewritten).
+* `main`: accept `--real-db` alongside `-h`/`--help`;
+  a script-scoped mode variable replaces `TNS_ADMIN` as the source
+  of truth for mode (the existing code comment says the opposite and
+  must be rewritten).
 * `check_env_vars`: remove the `TNS_ADMIN`-triggered branch.
-* New `check_real_db`, run only with `--real-db` after all local
-  checks.
+* New `check_real_db`, run only with `--real-db` after all
+  local checks.
 * `print_environment_summary`: mode line and real-db lines per D5.
 * `print_usage`: rewrite environment-variable and notes sections.
 * Header: v1.11.
 
 Undecided details, to settle while drafting: repeated or combined
-flags (e.g. `--real-db --help`); whether an unreadable `tnsnames.ora`
-has its own message; exact output-line wording.
+flags (e.g. `--real-db --help`); whether an unreadable
+`tnsnames.ora` has its own message; exact output-line wording.
 
 #### 2.2.6 Pending OCI evidence (not blocking)
 
 A read-only evidence script was proposed for OCI Frankfurt: installed
 python-oracledb version, files in `$TNS_ADMIN` (names only), the
-`ARADB` entry in `tnsnames.ora` (protocol TCP or TCPS), non-comment
-lines of client `sqlnet.ora`, and server-side `ENCRYPTION` /
-`CRYPTO_CHECKSUM` settings if readable. Not yet run. Its main purpose
-is now §4.4.
+`ARADB` entry in `tnsnames.ora` (protocol TCP or TCPS),
+non-comment lines of client `sqlnet.ora`, and server-side
+`ENCRYPTION`/`CRYPTO_CHECKSUM` settings if readable. Not yet
+run. Its main purpose is now §4.4.
 
 ## 3. Decisions in force
 
@@ -407,7 +394,6 @@ is now §4.4.
 Owner: Jan
 
 * ACE uses exactly two project-control documents:
-
   * `docs/project_summary.md`;
   * `docs/todo.md`.
 * Both control documents remain tracked in Git.
@@ -416,7 +402,8 @@ Owner: Jan
 * No separate decision log will be introduced.
 * Rejected and superseded items that must remain recorded belong in
   `docs/todo.md`.
-* Material session outcomes belong in `docs/project_summary.md`.
+* Material session outcomes belong in `docs/project_summary.md`
+  during session close-out.
 * No additional project-control document may be used unless
   `docs/dev_workflow.md` is explicitly revised and approved.
 
@@ -437,17 +424,18 @@ Owner: Jan
 
 Support: Current assistant
 
-* Section 10 of `docs/dev_workflow.md` and the Bash requirements in
-  `docs/conventions.md` have no substantive conflict.
-* For a managed repository Bash file, the mandatory `ARC_FILE:` marker
-  remains on line 1.
-* The requirement to place `set -euo pipefail` "at the top" means
-  before operational commands. It does not prohibit the required
-  `ARC_FILE:` marker or introductory comments.
+* Section 10 of `docs/dev_workflow.md` and the Bash requirements
+  in `docs/conventions.md` have no substantive conflict.
+* For a managed repository Bash file, the mandatory `ARC_FILE:`
+  marker remains on line 1.
+* The requirement to place `set -euo pipefail` "at the top"
+  means before operational commands. It does not prohibit the required
+  marker or introductory comments.
 * A temporary script presented in conversation is not a managed
-  repository file and therefore does not require an `ARC_FILE:` line.
-* No change to `docs/conventions.md` is required to resolve the Bash
-  review.
+  repository file and therefore does not require an `ARC_FILE:`
+  line.
+* No change to `docs/conventions.md` is required to resolve the
+  Bash review.
 
 ### 3.4 Documentation scope
 
@@ -458,8 +446,8 @@ Owner: Jan
 * The inconsistent Python file-header example in
   `docs/conventions.md` is deferred to Step 0.7.
 * Possible conflict between `docs/git_workflow.md` and the closed
-  commit-prefix set in `docs/dev_workflow.md` is deferred to Step 0.7
-  unless it blocks a commit before then.
+  commit-prefix set in `docs/dev_workflow.md` is deferred to
+  Step 0.7 unless it blocks a commit before then.
 * Automation of session opening and close-out remains deferred until
   it is separately designed, reviewed, and approved.
 
@@ -469,11 +457,12 @@ Owner: Jan
 
 * Phase 0 establishes the staging-schema pattern.
 * Phase 0 does not provision Oracle application schemas.
-* Creation and use of `snomed` and `snomed_stage` belong to Phase 1.
-* `db_connection.py` recognizes `sys` only for privileged Oracle
-  provisioning.
-* Neither local nor real-database bootstrap may use `sys` or require
-  SYSDBA credentials.
+* Creation and use of `snomed` and `snomed_stage` belong to
+  Phase 1.
+* `db_connection.py` recognizes `sys` only for privileged
+  Oracle provisioning.
+* Neither local nor real-database bootstrap may use `sys` or
+  require SYSDBA credentials.
 * The approved Phase 1 setup procedure determines privileged access.
 * This boundary was actively violated by the inherited
   `scripts/bootstrap.sh`'s `TNS_ADMIN`-triggered
@@ -495,35 +484,33 @@ Owner: Jan
 
 Support: Current assistant
 
-`--real-db` remains unimplemented in `scripts/bootstrap.sh`. Design is
-in progress in §2.2.
-
-Design, implementation, and isolated testing of `--real-db` are not
-blocked and may proceed against isolated fixtures simulating
+`--real-db` remains unimplemented in `scripts/bootstrap.sh`.
+Design, implementation, and isolated testing of `--real-db` are
+not blocked and may proceed against isolated fixtures simulating
 successful connections and Oracle failures.
 
 Real-schema verification: `Blocked` pending Phase 1 provisioning of
-the `snomed` and `snomed_stage` schemas as nonprivileged accounts,
-and possibly by §4.4.
+the `snomed` and `snomed_stage` schemas as nonprivileged
+accounts, and possibly by §4.4.
 
 * `--real-db` verification must confirm each account connects and
   executes a read-only query — nothing more privileged.
 * Isolated-fixture testing does not constitute evidence that real
-  schemas are reachable; only execution against real Oracle
-  schemas does.
-* Until real-schema verification is performed, any
-  deployment-readiness claim requiring actual Oracle connectivity
-  must be treated as unverified.
+  schemas are reachable; only execution against real Oracle schemas
+  does.
+* Until real-schema verification is performed, any deployment-
+  readiness claim requiring actual Oracle connectivity must be treated
+  as unverified.
 
 Required action:
 
 * [x] Review `db_connection.py`'s approved interface for Oracle
   reachability checks — performed 2026-10-09; findings in §2.2.3,
   outcome decisions A–C pending.
-* [ ] Design `--real-db`'s check of both `snomed` and `snomed_stage`
-  schemas, safe handling of unprovisioned schemas, and confirmation
-  that no Oracle objects are modified — without requiring SYS/SYSDBA
-  credentials, per §3.5. In progress, §2.2.4.
+* [ ] Design `--real-db`'s check of both `snomed` and
+  `snomed_stage` schemas, safe handling of unprovisioned schemas,
+  and confirmation that no Oracle objects are modified — without
+  requiring SYS/SYSDBA credentials, per §3.5. In progress, §2.2.4.
 
 ### 4.2 OCI virtual environment
 
@@ -534,18 +521,16 @@ Owner: Jan
 Verification (2026-09-19): the precondition check of the OCI test
 wrapper found exactly one virtual-environment candidate:
 
-```text
-./wenv/bin/activate
-```
+    ./wenv/bin/activate
 
 The actual OCI virtual environment is therefore `wenv`.
 
-`config/project.yaml` still declares a path ending in `/venv` for both
-the production environment (line 34) and the development environment
-(line 50). No reference to those values was found in
-`scripts/bootstrap.sh` or in `src/`, which identify the virtual
-environment through `VIRTUAL_ENV`. Other possible consumers were not
-checked.
+`config/project.yaml` still declares a path ending in `/venv`
+for both the production environment (line 34) and the development
+environment (line 50). No reference to those values was found in
+`scripts/bootstrap.sh` or in `src/`, which identify the
+virtual environment through `VIRTUAL_ENV`. Other possible consumers
+were not checked.
 
 Required action:
 
@@ -555,22 +540,44 @@ Required action:
 * [ ] Check for any other consumer of `paths.venv` before changing
   configuration.
 
-### 4.3 UZIS correspondence
+### 4.3 UZIS and SNOMED International follow-up
 
 Lifecycle status: `Agreed`
 
-Status modifier: `Blocked`
+Status modifier: `Blocked` pending contact details
 
 Owner: Jan
 
-* `docs/uzis_correspondence.md` version 1.1 contains a draft email to
-  MUDr. Molinari that was not sent.
-* Her email address remains unknown.
-* Any statement that ACE is awaiting her response must be verified and
-  corrected if necessary.
-* The key requests in `docs/uzis_meeting_prep.md` do not appear to be
-  answered in the available meeting notes.
-* The possible follow-up gap remains unresolved.
+Support: Current assistant
+
+The UZIS workshop took place on 2026-11-23. Jan could not pose his
+prepared questions during the session. A SNOMED International
+representative invited follow-up contact.
+
+The existing draft in `docs/uzis_correspondence.md` was not
+reported as sent. MUDr. Molinari’s email address and the appropriate
+SNOMED International contact remain to be confirmed.
+
+Points to clarify:
+
+* Ask MUDr. Molinari for the appropriate SNOMED International contact
+  for Jan’s implementation questions.
+* Ask whether the implementer or user group mentioned at the workshop
+  already exists or is still planned.
+* Ask which international implementation guidance applies to Czech
+  vendor implementations and how it relates to Czech specifications.
+* Clarify what the workshop speaker meant by “EHR” and its connection
+  to SNOMED CT. The exact term and relevance to ACE remain unconfirmed.
+* Identify the appropriate contact or documentation for supported
+  RF2 release checking and downloads.
+
+Approved next actions:
+
+1. Review and update the existing correspondence draft to request the
+   contact and these clarifications.
+2. Jan reviews and sends the email.
+3. Record the reply and any confirmed contact or group details in the
+   existing ACE documentation.
 
 ### 4.4 Oracle Native Network Encryption vs Thin mode
 
@@ -582,16 +589,16 @@ Support: Current assistant
 
 python-oracledb Thin mode does not support Oracle Native Network
 Encryption (NNE) or native checksumming. Per Jan (2026-10-09), OCI
-Base Database enables NNE as `REQUIRED` by default; a Thin connection
-may then fail with `DPY-3001`, `DPY-4011`, `DPY-6000`, or a
-corresponding Oracle error. Supported remedies are TLS (TCPS) or
-Thick mode.
+Base Database enables NNE as `REQUIRED` by default; a Thin
+connection may then fail with `DPY-3001`, `DPY-4011`,
+`DPY-6000`, or a corresponding Oracle error. Supported remedies
+are TLS (TCPS) or Thick mode.
 
 `db_connection.py` is Thin-only. If ACE's OCI database enforces NNE,
-no ACE code can connect to it, which affects real-schema
-verification and all of Phase 1 ingestion. This is a project-level
-decision outside Step 0.6. It does not block isolated implementation
-of `--real-db`.
+no ACE code can connect to it, which affects real-schema verification
+and all of Phase 1 ingestion. This is a project-level decision outside
+Step 0.6. It does not block isolated implementation of
+`--real-db`.
 
 Required action:
 
@@ -616,16 +623,14 @@ Required evidence review:
 
 * [ ] Determine whether preserved evidence confirms execution with:
 
-  ```
-  SNOMED_TEST_REAL_DB=true
-  ```
+      SNOMED_TEST_REAL_DB=true
 
 * [ ] Repeat the applicable real-Oracle verification during Phase 0
   close-out if the evidence is insufficient.
 
 Repeating this verification does not reopen Step 0.5 implementation.
-§4.4 may bear on why evidence is missing; the `TNS_ADMIN` hypothesis
-was rejected (§2.2.3 finding 7).
+§4.4 may bear on why evidence is missing; the `TNS_ADMIN`
+hypothesis was rejected (§2.2.3 finding 7).
 
 ## 6. Deferred work and backlog
 
@@ -648,14 +653,14 @@ Begin only after Step 0.6 is complete.
 * [ ] Decide whether the repository requires a revised root
   `README.md`.
 * [ ] Check cross-document terminology, scope, and stale references.
-* [ ] Verify the actual contents and intended use of
-  `sql/ddl/tables/`.
-* [ ] Resolve privileged Oracle credential-name inconsistencies (note:
-  `docs/infrastructure.md` §5 uses `SNOMED_ADMIN_DB_PASSWORD`;
-  `config/database.yaml` and the now-removed bootstrap check use
-  `SNOMED_SYS_DB_PASSWORD` — these never matched).
-* [ ] Review `scripts/common/run.sh` and corresponding documentation
-  claims.
+* [ ] Verify the actual contents and intended use of `sql/ddl/tables/`.
+* [ ] Resolve privileged Oracle credential-name inconsistencies:
+  `docs/infrastructure.md` §5 uses
+  `SNOMED_ADMIN_DB_PASSWORD`; `config/database.yaml` and the
+  now-removed bootstrap check use `SNOMED_SYS_DB_PASSWORD` — these
+  never matched.
+* [ ] Review `scripts/common/run.sh` and corresponding
+  documentation claims.
 * [ ] Correct the inconsistent Python file-header example in
   `docs/conventions.md`.
 * [ ] Add the Python test invocation convention to
@@ -663,18 +668,18 @@ Begin only after Step 0.6 is complete.
   `python3 tests/<file>.py`, no pytest. The document currently says
   `python`, not `python3`.
 * [ ] Correct the stale "master todo.md … TOOLING section" reference
-  in `docs/conventions.md` (ACE's `docs/todo.md` has no such section;
-  presumably the arc repository's todo is meant).
-* [ ] Check `docs/git_workflow.md` against the closed commit-prefix set
-  in `docs/dev_workflow.md`.
+  in `docs/conventions.md` (ACE's `docs/todo.md` has no such
+  section; presumably the arc repository's todo is meant).
+* [ ] Check `docs/git_workflow.md` against the closed commit-prefix
+  set in `docs/dev_workflow.md`.
 * [ ] Decide during the environment-summary conformance review
   whether the active configuration profile and log directory should
   be added to the summary.
 * [ ] Spec lists "required project configuration" among local-mode
-  checks; `scripts/bootstrap.sh` has no such check. Decide whether to
-  add one or revise the spec.
-* [ ] `src/common/db_connection.py` `get_connection` does not chain
-  its final exception (`from last_exc`), contrary to
+  checks; `scripts/bootstrap.sh` has no such check. Decide whether
+  to add one or revise the spec.
+* [ ] `src/common/db_connection.py` `get_connection` does not
+  chain its final exception (`from last_exc`), contrary to
   `docs/conventions.md` (subject to decision A).
 * [ ] `src/common/config_loader.py` raises plain built-in and
   OmegaConf exceptions, while `src/common/exceptions.py` documents
@@ -699,15 +704,16 @@ removed:
 
 * [ ] Review `docs/claude_chat_howto.md` and determine whether it
   should be deleted.
-* [ ] Decide whether `docs/patch_26ai.md` should move to the canonical
-  `docs/runbooks/` location, creating that directory if required.
-  Do not recreate the obsolete singular `docs/runbook/` path.
+* [ ] Decide whether `docs/patch_26ai.md` should move to the
+  canonical `docs/runbooks/` location, creating that directory if
+  required. Do not recreate the obsolete singular `docs/runbook/`
+  path.
 * [ ] Remove the root `.pytest_cache/` and verify the applicable
   `.gitignore` rule.
 * [ ] Remove unneeded `.DS_Store` files without staging unrelated
   filesystem changes.
-* [ ] Review the proposed YAML migration of `check_env_vars` (moving
-  the hardcoded bash array to a YAML config, mirroring
+* [ ] Review the proposed YAML migration of `check_env_vars`
+  (moving the hardcoded bash array to a YAML config, mirroring
   `check_required_dirs`). After D1/D2 the array holds only
   `SNOMED_LOG_DIR` and `SNOMED_LOG_LEVEL`.
 
@@ -732,18 +738,13 @@ Support: Current assistant
 
 * [ ] Verify the current Oracle Database version and patch level on
   OCI.
-
 * [ ] Review the evidence from the earlier unsuccessful 26ai upgrade
   or patch attempt.
-
 * [ ] Distinguish whether the unresolved work is:
-
   * an upgrade to Oracle Database 26ai;
   * a patch for an existing 26ai installation;
   * or recovery from a partially completed attempt.
-
 * [ ] Agree on a safe update or recovery procedure before retrying.
-
 * [ ] Record any continuing dependency on Oracle Support.
 
 ### 6.4 Contacts
@@ -784,7 +785,7 @@ Begin after Phase 0 is complete.
 * [ ] Revise `docs/dev_workflow.md` explicitly before Claude Code
   becomes part of the approved ACE workflow.
 
-### 6.6 dev_workflow.md revision — explicit prefix statement
+### 6.6 `dev_workflow.md` revision — explicit prefix statement
 
 Lifecycle status: `Agreed`
 
@@ -792,10 +793,11 @@ Owner: Jan
 
 Support: Current assistant
 
-Add an explicit step to `dev_workflow.md` §7 requiring the assistant to
-state which approved commit-message prefix applies and why, before
-presenting any commit message. This applies as a general rule to any
-LLM acting as "Current assistant," not to a specific model.
+Add an explicit step to `dev_workflow.md` §7 requiring the
+assistant to state which approved commit-message prefix applies and
+why, before presenting any commit message. This applies as a general
+rule to any LLM acting as "Current assistant," not to a specific
+model.
 
 This is a revision to an `Approved` document and requires its own
 review-and-approval cycle per `dev_workflow.md`'s explicit revision
@@ -810,7 +812,7 @@ Approved next actions:
 3. Bump `docs/dev_workflow.md` to the next version.
 4. Commit and push the revised workflow document.
 
-### 6.7 ANTHEA transfer of ace_architecture.md
+### 6.7 ANTHEA transfer of `ace_architecture.md`
 
 Lifecycle status: `Agreed`
 
@@ -820,16 +822,17 @@ Owner: Jan
 
 Support: Current assistant
 
-`docs/ace_architecture.md` is committed to ACE temporarily. Jan has
-stated that after `v0.1.0-phase0` is tagged, it should be transferred
-into the ANTHEA repository and then removed from ACE. ANTHEA's own
-repository status is not yet confirmed; this is revisited when ANTHEA
-work resumes after Phase 0.
+`docs/ace_architecture.md` is committed to ACE temporarily. Jan
+has stated that after `v0.1.0-phase0` is tagged, it should be
+transferred into the ANTHEA repository and then removed from ACE.
+ANTHEA's own repository status is not yet confirmed; this is revisited
+when ANTHEA work resumes after Phase 0.
 
 Required action:
 
-* [ ] After `v0.1.0-phase0` is tagged, commit `docs/ace_architecture.md`
-  into the ANTHEA repository (once confirmed reachable).
+* [ ] After `v0.1.0-phase0` is tagged, commit
+  `docs/ace_architecture.md` into the ANTHEA repository (once
+  confirmed reachable).
 * [ ] Remove `docs/ace_architecture.md` from the ACE repository once
   the ANTHEA transfer is confirmed.
 
@@ -843,13 +846,63 @@ Owner: Jan
 
 Support: Current assistant
 
-`tests/test_bootstrap_r1_sh.sh` (and potentially other Round files) currently run against the real project tree because a temporary `config/directory_structure.yaml` override is not possible without patching. This is accepted for now, with real-tree mutations hardened (state-verified before mutating, restored immediately, backed by a suite-level EXIT trap) rather than eliminated.
+`tests/test_bootstrap_r1_sh.sh` (and potentially other Round files)
+currently run against the real project tree because a temporary
+`config/directory_structure.yaml` override is not possible without
+patching. This is accepted for now, with real-tree mutations hardened
+(state-verified before mutating, restored immediately, backed by a
+suite-level EXIT trap) rather than eliminated.
 
 Deferred work:
 
-* [ ] Design and build an isolated fixture-root harness: a fresh temporary directory per test/fixture group, with `scripts/`, `src/common/`, and a controllable `config/` copied or symlinked in, so `directory_structure.yaml` can be overridden per test without touching the real repository at all.
-* [ ] Once the harness exists, extend Round 1 coverage to bootstrap's own independent directory-safety checks (not just the helper's): rejection of an absolute directory path, a `..` component, and a directory that resolves through a symlink escaping `PROJECT_ROOT` — security-relevant behavior introduced in the Step 0.6 revision that is not currently exercised at the bootstrap level, only at the helper level.
-* [ ] Once the harness exists, revisit whether the same isolation should extend to the other Round files still running against the real tree.
+* [ ] Design and build an isolated fixture-root harness: a fresh
+  temporary directory per test/fixture group, with `scripts/`,
+  `src/common/`, and a controllable `config/` copied or
+  symlinked in, so `directory_structure.yaml` can be overridden
+  per test without touching the real repository at all.
+* [ ] Once the harness exists, extend Round 1 coverage to bootstrap's
+  own independent directory-safety checks (not just the helper's):
+  rejection of an absolute directory path, a `..` component, and
+  a directory that resolves through a symlink escaping
+  `PROJECT_ROOT` — security-relevant behavior introduced in the Step
+  0.6 revision that is not currently exercised at the bootstrap
+  level, only at the helper level.
+* [ ] Once the harness exists, revisit whether the same isolation
+  should extend to the other Round files still running against the
+  real tree.
+
+### 6.9 Phase 1 — SNOMED CT release ingestion and storage
+
+Lifecycle status: `Agreed`
+
+Status modifier: `Deferred`
+
+Owner: Jan
+
+Support: Current assistant
+
+Phase 1 will load SNOMED CT release content into ACE's Oracle database
+so ACE can use it as queryable terminology data. RF2 is the release
+distribution format; the files must be imported into the planned
+database representation. The workshop raised storage and automation,
+but the specific process discussed was not confirmed.
+
+Before designing or offering ingestion commercially:
+
+* [ ] Identify the applicable SNOMED CT licensing and use conditions
+  for ACE's intended users and deployment.
+* [ ] Confirm whether affiliates may check for and download releases
+  programmatically, including through the MLDS API or another
+  supported mechanism.
+* [ ] Confirm whether scheduled, unattended release checks and
+  downloads are supported.
+* [ ] Design how RF2 content will be loaded, stored, versioned, and
+  updated in Oracle, including how failures will be handled.
+* [ ] Ask SNOMED International which implementation guidance or
+  support resources apply.
+
+These items belong to Phase 1 planning. They do not expand Step 0.6
+or block its completion.
 
 ## 7. Rejected and superseded items
 
@@ -892,5 +945,5 @@ Outcome: `Rejected` (2026-10-09)
 Owner: Jan
 
 Raised by the current assistant from a misreading of the 2.1.2
-documentation; Jan verified that 2.1.2 supports `TNS_ADMIN` in Thin
-mode. It does not explain the §5 evidence gap.
+documentation; Jan verified that 2.1.2 supports `TNS_ADMIN` in
+Thin mode. It does not explain the §5 evidence gap.
