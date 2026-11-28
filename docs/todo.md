@@ -2,9 +2,9 @@
 
 # ACE — Todo
 
-# Version: 2.8
+# Version: 2.10
 
-# Updated: 2026-11-24
+# Updated: 2026-11-28
 
 # Status: Approved
 
@@ -80,23 +80,15 @@ Lifecycle statuses and status modifiers have the meanings defined in
 
 ## 1. Current focus
 
-Complete the post-workshop control-document close-out: review the
-updated `docs/project_summary.md` and `docs/todo.md` against the
-development workflow, commit and push them from Ubuntu, and verify the
-resulting repository state.
+Complete Phase 0 engineering in order:
 
-After close-out, resume the interrupted 2026-10-09 `--real-db`
-design in §2.2, resolve the remaining decisions, and complete the
-agreed Step 0.6 work in §2.1. UZIS follow-up in §4.3 and Phase 1
-ingestion planning in §6.9 do not block Phase 0 engineering.
+1. Finish Step 0.6 (§2.1). D1 is committed and pushed in 4bc5823, and Round 4 passed on Ubuntu and OCI. Next, resume the --real-db design, settle the remaining applicable decisions, and implement D2 with its isolated tests.
+2. Complete the Step 0.7 integration and conformance audit in §6.1 after Step 0.6 closes.
+3. Review the Step 0.5 evidence and perform any real-Oracle verification required for Phase 0 close-out (§5).
 
-Session state: the 2026-10-09 `--real-db` design session was
-interrupted, not closed (`docs/dev_workflow.md` §11). The SNOMED CT
-vocabulary update was subsequently committed in `584045f`. At the
-2026-11-24 repository check, `main` was clean and aligned with
-`origin/main`. The post-workshop control-document changes are
-the current close-out work.
+UZIS follow-up in §4.3 and Phase 1 ingestion planning in §6.9 do not block Phase 0 engineering.
 
+Session state: the post-workshop control-document close-out was committed and pushed in 2c54008. D1 was committed and pushed in 4bc5823. Round 4 passed 15/15 on Ubuntu and 15/15 on OCI. D2 and the remaining Step 0.6 work are not complete. At the latest reported Ubuntu status after the D1 push, main was aligned with origin/main and docs/todo.md remained modified and uncommitted; obtain fresh repository state during this close-out.
 ## 2. Active work units
 
 ### 2.1 Step 0.6 — remaining scope after the local-mode revision
@@ -171,18 +163,15 @@ Items:
 
 Approved next actions, in order:
 
-1. Review the approved `db_connection.py` interface, then design
-   and implement `--real-db` in `scripts/bootstrap.sh` with its
-   isolated tests (item 1). In progress: review performed, design
-   under decision in §2.2.
-2. Add environment-summary test coverage, local mode and
-   real-database mode ("Round 5") (item 3).
-3. Write the bootstrap verification protocol (item 2).
+1. Complete the --real-db design and implementation with isolated tests. D1 is complete in commit 4bc5823; resolve the remaining applicable decisions in §2.2 before D2 implementation.
+2. Add environment-summary test coverage for local and real-database modes ("Round 5") after D2 (item 3).
+3. Write the bootstrap verification protocol after D2 (item 2).
 4. Proceed to §6.1 (Step 0.7) once Step 0.6 closes.
 
-### 2.2 `--real-db` design — session 2026-10-09 (interrupted)
+### 2.2 `--real-db` design — sessions 2026-10-09 (interrupted) and 2026-11-28
 
-Lifecycle status: `Proposed` (per-decision statuses below)
+Lifecycle status: `Proposed` (per-decision statuses below; D1 work
+unit in §2.2.8)
 
 Owner: Jan
 
@@ -207,11 +196,17 @@ Step 0.6 section, `src/common/read_required_modules.py` v2.0,
 `src/common/config_loader.py` 0.4.0,
 `tests/test_bootstrap_r4_py.py` v1.3.
 
-#### 2.2.2 Material departure from plan
+#### 2.2.2 Material departures from plan
 
-Decision D1 expands approved next action 1 beyond "implement
-`--real-db`": it also corrects local-mode behavior and rewrites the
-Round 4 OCI tests. Recorded per `dev_workflow.md` §6.
+1. (2026-10-09) Decision D1 expands approved next action 1 beyond
+   "implement `--real-db`": it also corrects local-mode behavior and
+   revises the Round 4 OCI tests. Recorded per `dev_workflow.md` §6.
+2. (2026-11-28) D1 is implemented as an independent work unit
+   (§2.2.8) before A, B, C and D3–D8 are settled. This matches the
+   commit order proposed in D8, but implementation starts while D8 as
+   a whole is still `Proposed`. Until D2 is implemented,
+   `--real-db` fails immediately (D1 amendment 3). Recorded per
+   `dev_workflow.md` §6.
 
 #### 2.2.3 Review findings — `db_connection.py` (WU1, review applied)
 
@@ -229,8 +224,8 @@ Round 4 OCI tests. Recorded per `dev_workflow.md` §6.
    `from last_exc`), contrary to `docs/conventions.md`. The
    Oracle code is available only in `exc.detail` text, which by
    the `exceptions.py` convention carries it (e.g. ORA-12541).
-5. Every connection is retried once after 2 seconds. A wrong password
-   causes two failed logons per schema per run
+5. Every connection is retried once after 2 seconds. A wrong
+   password causes two failed logons per schema per run
    (`FAILED_LOGIN_ATTEMPTS` lockout risk); an unreachable host costs
    tens of seconds per schema.
 6. Credential safety is sound: passwords are never logged or put in
@@ -253,13 +248,17 @@ Further facts from the other reviewed files:
 * `exceptions.py`: `SnomedDBConnectionError.exit_code` is 2;
   bootstrap must map every failure to exit 1 (spec allows only 0 and
   1).
-* `config_loader.py`: raises plain `FileNotFoundError`,
-  `ValueError`, `IOError`, `KeyError` and OmegaConf
-  errors, not `SnomedConfigError`. The helper must catch
-  configuration failures broadly. No import-time side effects.
+* `config_loader.py`: raises plain `FileNotFoundError`, `ValueError`,
+  `IOError`, `KeyError` and OmegaConf errors, not `SnomedConfigError`.
+  The helper must catch configuration failures broadly. No import-time
+  side effects.
 * `tests/test_bootstrap_r4_py.py`: currently asserts that local mode
   with `TNS_ADMIN` set requires both application passwords and
   prints "Mode: OCI/production". Affected by D1.
+* `scripts/bootstrap.sh` v1.10 (reported by Jan, 2026-11-28; to be
+  re-verified when the file is read): already rejects unknown
+  arguments with exit 1 before running any checks, but only refers
+  the user to the help option and does not print usage.
 
 #### 2.2.4 Decision ledger
 
@@ -273,17 +272,52 @@ the bootstrap verification protocol rather than change it. Status:
 `Proposed`, awaiting Jan.
 
 C — Reword the "unprovisioned schema" requirement in §2.1 item 1 and
-in `docs/phase0_foundation.md` per finding 3. Status:
-`Proposed`, awaiting Jan.
+in `docs/phase0_foundation.md` per finding 3. Status: `Proposed`,
+awaiting Jan.
 
 D1 — Mode model aligned with the spec. Exactly two bootstrap modes:
 local (default) and real-db (`--real-db`). `TNS_ADMIN` no longer
 changes what local mode checks; it becomes a real-db precondition.
 Summary prints "Mode: local" or "Mode: real-db". Fixes the current
 violation of the spec rule that local mode must not require
-application-schema passwords. Round 4 OCI tests to be rewritten; a
+application-schema passwords. Round 4 OCI tests to be revised; a
 new test guards that local mode passes with `TNS_ADMIN` set and no
-passwords. Status: `Agreed` (2026-10-09).
+passwords. Status: `Agreed` (2026-10-09; amended 2026-11-28 as
+below).
+
+D1 amendments (2026-11-28, agreed by Jan):
+
+1. Round 4 is revised, not replaced: only tests asserting that
+   `TNS_ADMIN` selects OCI mode, makes application passwords
+   mandatory, or produces "Mode: OCI/production" are changed. The
+   log-variable tests and the SYSDBA-credential guard are kept. The
+   previous version remains in Git history.
+2. Unknown arguments: keep the existing behavior (exit 1, no checks
+   run) and additionally print usage to stderr. `-h` and `--help`
+   print usage to stdout and exit 0.
+3. Interim `--real-db` (until D2 is implemented): print exactly
+   `bootstrap: --real-db is not implemented yet (Step 0.6, D2).`
+   to stderr and exit 1 immediately — no checks run and no summary
+   is printed. Once D2 is implemented, `--real-db` runs all local
+   checks first and then `check_real_db`, as D2 specifies.
+4. Exit codes stay 0 (success) and 1 (failure), per the bootstrap
+   contract.
+5. Commit prefix: `fix:`. The interim rejection prevents a false
+   success and does not implement the real-db feature, which belongs
+   to the D2 `feat:` commit.
+6. Non-goals: no configuration-profile (`development`/`production`)
+   handling, no D2 helper, no database checks.
+7. Argument parsing (agreed 2026-11-28): all arguments are examined
+   before any check runs. If `-h` or `--help` appears anywhere,
+   usage is printed to stdout and the script exits 0, whatever the
+   other arguments (e.g. `--real-db --help`). Otherwise a repeated
+   `--real-db` is an error: exit 1, usage to stderr, no checks
+   run. Any unknown argument, including `realdb` without the
+   leading dashes, fails per amendment 2.
+8. Versions (agreed 2026-11-28): the D1 commit carries
+   `scripts/bootstrap.sh` v1.11 and `tests/test_bootstrap_r4_py.py`
+   v1.4; the D2 `feat:` commit then carries `bootstrap.sh` v1.12
+   (amends D8 item 2 and §2.2.5).
 
 D2 — Flow. All local checks run first, unchanged; then
 `check_real_db`. Bash requires `TNS_ADMIN` set to an existing
@@ -300,8 +334,8 @@ helper `src/common/check_db_connectivity.py`:
 * call `test_connection` per schema, continuing after a failure;
 * return the TNS alias for the summary.
 
-The `database.yaml` comment is to be corrected (in the D8
-`docs:` commit) to: "`tnsnames.ora` is required for ACE's
+The `database.yaml` comment is to be corrected (in the D8 `docs:`
+commit) to: "`tnsnames.ora` is required for ACE's
 python-oracledb Thin-mode alias resolution. Thin mode does not read
 `sqlnet.ora`; that file may still be used by Oracle Client/Thick-mode
 tools involved in Phase 1 provisioning." Status: `Agreed`
@@ -311,7 +345,8 @@ D3 — Output channel. Helper writes result records to a
 `--result-file` (mktemp, registered in `TEMP_FILES`); helper
 stdout/stderr (log lines) captured to another temporary file and shown
 only on failure. Alternative considered: prefixed record lines on
-stdout. Status: `Proposed`, awaiting Jan.
+stdout. Record format not yet decided (JSON suggested). Status:
+`Proposed`, awaiting Jan.
 
 D4 — Per-schema classification, printing only the code plus a fixed
 hint, never raw Oracle text:
@@ -330,23 +365,24 @@ hint, never raw Oracle text:
 
 Any failure exits 1. Revised 2026-10-09 after Jan's NNE objection.
 Jan's message specifying what the DPY-6000 hint should mention was
-cut off and must be completed on resumption. Status: `Proposed`.
+cut off and must be completed. While §4.4 is unresolved, the hint
+must not assert NNE as the cause. A, B and C are to be settled
+together with D4 as one error-handling unit. Status: `Proposed`.
 
 D5 — Real-db summary adds "Oracle connection identifier: ARADB",
 "Oracle schema snomed: OK", "Oracle schema snomed_stage: OK". No
 credential values. Status: `Proposed`, awaiting Jan.
 
 D6 — Isolated tests at two levels. Helper-level: direct invocation
-with `--config-dir` fixtures. Bootstrap-level: fake
-`oracledb` package in a mkdtemp directory first on `PYTHONPATH`,
-behavior per schema set by a control variable (OK, 01017, 28000, 3001,
-6000, 12541, other); the fake provides `connect`,
-`DatabaseError`, `AUTH_MODE_SYSDBA` and a `Connection`
-class, and records every call so tests assert: only `snomed` and
-`snomed_stage` connected, SYSDBA never requested, only
-`SELECT 1 FROM DUAL` executed, nothing committed.
-`SNOMED_LOG_DIR` is a mkdtemp directory. Sentinel password values
-must never appear in stdout or stderr. Status: `Proposed`,
+with `--config-dir` fixtures. Bootstrap-level: fake `oracledb`
+package in a mkdtemp directory first on `PYTHONPATH`, behavior per
+schema set by a control variable (OK, 01017, 28000, 3001, 6000, 12541,
+other); the fake provides `connect`, `DatabaseError`,
+`AUTH_MODE_SYSDBA` and a `Connection` class, and records every call
+so tests assert: only `snomed` and `snomed_stage` connected, SYSDBA
+never requested, only `SELECT 1 FROM DUAL` executed, nothing
+committed. `SNOMED_LOG_DIR` is a mkdtemp directory. Sentinel password
+values must never appear in stdout or stderr. Status: `Proposed`,
 awaiting Jan.
 
 D7 — Round numbering. Open question: `--real-db` tests as
@@ -354,38 +390,93 @@ D7 — Round numbering. Open question: `--real-db` tests as
 coverage), or as r5 with summary coverage moved to r6. Status:
 `Proposed`, awaiting Jan.
 
-D8 — Commits, in order: (1) `fix:` D1 local-mode correction plus
-rewritten Round 4; (2) `feat:` `--real-db`,
-`bootstrap.sh` v1.11, the helper and its tests; (3) `docs:`
-decision C wording, `database.yaml` comment, new §6.1 items.
-Before the first of these, check `docs/git_workflow.md` against the
-closed prefix set. Status: `Proposed`, awaiting Jan.
+D8 — Commits, in order: (1) fix: D1 local-mode correction plus revised Round 4; (2) feat: --real-db, bootstrap.sh v1.12 (D1 amendment 8), the helper and its tests; (3) docs: decision C wording, database.yaml comment, new §6.1 items. The docs/git_workflow.md status/prefix check was not documented as completed before D1; Jan defers that review to the post-Phase-0 ARC workflow review in §6.10. Status: item (1) Pushed in 4bc5823 (prefix fix:); the rest Proposed, awaiting Jan.
 
 #### 2.2.5 `bootstrap.sh` changes implied by D1–D5
 
 * `main`: accept `--real-db` alongside `-h`/`--help`;
   a script-scoped mode variable replaces `TNS_ADMIN` as the source
   of truth for mode (the existing code comment says the opposite and
-  must be rewritten).
+  must be rewritten). Unknown arguments print usage to stderr and
+  exit 1 (D1 amendment 2).
 * `check_env_vars`: remove the `TNS_ADMIN`-triggered branch.
 * New `check_real_db`, run only with `--real-db` after all
-  local checks.
-* `print_environment_summary`: mode line and real-db lines per D5.
+  local checks (D2; in the D1 interim, `--real-db` fails
+  immediately per D1 amendment 3).
+* `print_environment_summary`: mode line (D1) and real-db lines per
+  D5.
 * `print_usage`: rewrite environment-variable and notes sections.
-* Header: v1.11.
+* Header: v1.11 (D1); v1.12 (D2), per D1 amendment 8.
 
 Undecided details, to settle while drafting: repeated or combined
-flags (e.g. `--real-db --help`); whether an unreadable
+flags (settled in D1 amendment 7); whether an unreadable
 `tnsnames.ora` has its own message; exact output-line wording.
 
 #### 2.2.6 Pending OCI evidence (not blocking)
 
 A read-only evidence script was proposed for OCI Frankfurt: installed
 python-oracledb version, files in `$TNS_ADMIN` (names only), the
-`ARADB` entry in `tnsnames.ora` (protocol TCP or TCPS),
-non-comment lines of client `sqlnet.ora`, and server-side
-`ENCRYPTION`/`CRYPTO_CHECKSUM` settings if readable. Not yet
-run. Its main purpose is now §4.4.
+`ARADB` entry in `tnsnames.ora` (protocol TCP or TCPS), non-comment
+lines of client `sqlnet.ora`, and server-side
+`ENCRYPTION`/`CRYPTO_CHECKSUM` settings if readable. Not yet run.
+Its main purpose is now §4.4.
+
+#### 2.2.7 Session-opening verification (2026-11-28)
+
+Jan is working on the MacBook (pull-only); repository state was taken
+from Ubuntu. Repository `/home/jan/project_embeddings`, branch
+`main`, HEAD `2c54008` (`docs: close out project control
+documents`), clean, aligned with `origin/main` after fetch (0 ahead,
+0 behind). Matches `docs/project_summary.md` (updated 2026-11-24).
+Commits since §2.2.1: `0a85bef` (this ledger), `584045f` (SNOMED
+vocabulary v0.5), `2c54008` (close-out).
+
+Files reviewed this session: `docs/dev_workflow.md` v2.2,
+`docs/project_summary.md`, `docs/todo.md` §2.2 (excerpt).
+
+#### 2.2.8 Work unit — D1 implementation
+
+Status: `Pushed` (2026-11-28; Round 4 passed on Ubuntu and OCI).
+
+Scope: `scripts/bootstrap.sh` and the affected cases in
+`tests/test_bootstrap_r4_py.py`, per D1 and its amendments.
+
+Prerequisites:
+
+1. Read the current `scripts/bootstrap.sh`,
+   `tests/test_bootstrap_r4_py.py`, `docs/conventions.md` and the
+   `docs/phase0_foundation.md` Step 0.6 section.
+2. Search the repository for `Mode: OCI/production` and `TNS_ADMIN`
+   in `*.py`, `*.sh` and `*.md` files. Report any match outside the
+   scope above; do not change it within this unit.
+3. The planned docs/git_workflow.md status/prefix check was not documented as complete before the D1 commit. Jan has deferred determining whether that document is active and reconciling it with the approved prefixes to the post-Phase-0 ARC review (§6.10).
+
+Required tests:
+
+1. No arguments, isolated environment: exit 0, "Mode: local".
+2. `TNS_ADMIN` set to a temporary directory, both
+   application-schema password variables unset: exit 0,
+   "Mode: local", no password requested.
+3. `--real-db`: exit 1, the exact interim message on stderr, no
+   check output, no summary.
+4. Unknown argument: exit 1, usage on stderr, no checks run.
+5. `-h` and `--help`: exit 0, usage on stdout.
+6. Required log-variable checks still enforced (existing tests).
+7. SYSDBA credentials never required (existing guard).
+8. No output contains "Mode: OCI/production".
+9. `--real-db --help` and `--help --real-db`: exit 0, usage on
+   stdout, no checks; `--real-db --real-db`: exit 1, usage on
+   stderr, no checks (D1 amendment 7).
+
+All tests use isolated temporary fixtures and never a real wallet or
+`TNS_ADMIN` path (`dev_workflow.md` §8).
+
+Sequence (updated after D1 verification):
+
+1. Transfer the §2.2 D1 scope to Ubuntu — completed.
+2. Produce and transfer scripts/bootstrap.sh v1.11 and tests/test_bootstrap_r4_py.py v1.4 — completed. Round 4 passed 15/15 on Ubuntu and 15/15 on OCI.
+3. Commit and push only the two D1 files from Ubuntu — completed in 4bc5823.
+4. Complete the control-document close-out in a separate docs: commit and push, then verify the final repository state — pending.
 
 ## 3. Decisions in force
 
@@ -445,9 +536,11 @@ Owner: Jan
   documentation issue directly blocks current work.
 * The inconsistent Python file-header example in
   `docs/conventions.md` is deferred to Step 0.7.
-* Possible conflict between `docs/git_workflow.md` and the closed
-  commit-prefix set in `docs/dev_workflow.md` is deferred to
-  Step 0.7 unless it blocks a commit before then.
+* The status of docs/git_workflow.md and its relationship to the
+  approved commit-prefix set will be resolved in the ARC project
+  after Phase 0. It does not block current Phase 0 work; see §6.10.
+* After Phase 0, review and revise the ACE development workflow as
+  a whole for planned use of agents and ARC aliases.sh; see §6.10.
 * Automation of session opening and close-out remains deferred until
   it is separately designed, reviewed, and approved.
 
@@ -670,8 +763,8 @@ Begin only after Step 0.6 is complete.
 * [ ] Correct the stale "master todo.md … TOOLING section" reference
   in `docs/conventions.md` (ACE's `docs/todo.md` has no such
   section; presumably the arc repository's todo is meant).
-* [ ] Check `docs/git_workflow.md` against the closed commit-prefix
-  set in `docs/dev_workflow.md`.
+* [ ] Resolve docs/git_workflow.md status and prefix compatibility
+  after Phase 0 in the ARC workflow review (§6.10).
 * [ ] Decide during the environment-summary conformance review
   whether the active configuration profile and log directory should
   be added to the summary.
@@ -903,6 +996,20 @@ Before designing or offering ingestion commercially:
 
 These items belong to Phase 1 planning. They do not expand Step 0.6
 or block its completion.
+
+### 6.10 Post-Phase 0 development workflow review
+
+Lifecycle status: Agreed
+
+Status modifier: Deferred until Phase 0 is complete
+
+Owner: Jan
+
+Support: Current assistant
+
+After Phase 0, Jan will use the ARC project to resolve whether docs/git_workflow.md remains active and how it relates to the approved commit-prefix rules. Jan also plans to review and revise the ACE development workflow as a whole for planned use of agents and ARC aliases.sh.
+
+The current approved ACE workflow remains in force until any revision is designed, reviewed, and approved. Reconcile the existing §6.6 prefix-statement work within that broader review; do not silently discard it.
 
 ## 7. Rejected and superseded items
 

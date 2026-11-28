@@ -1,9 +1,9 @@
 # ARC_FILE: docs/project_summary.md
 # ACE — Project Summary
 
-**Updated:** 2026-11-24
-**Session close-out:** Pending review, commit, push, and verification
-**Prepared by:** Current assistant; based on repository output and information supplied by Jan Mura
+**Updated:** 2026-11-28
+**Session:** D1 implementation and control-document close-out, 2026-11-28
+**Prepared by:** Current assistant; Jan review pending
 **Current phase:** Phase 0 — Foundation and Infrastructure
 **Phase status:** In progress
 
@@ -11,56 +11,61 @@
 
 ## Project context
 
-Arachnet Clinical Embeddings (ACE) is a SNOMED CT terminology and semantic-search project using Oracle, Python, and Bash. It is owned by Arachnet Project z.s. and developed by Jan Mura. ANTHEA is the parallel theoretical project.
+Arachnet Clinical Embeddings (ACE) is a SNOMED CT terminology and semantic-search project using Oracle, Python, and Bash. It is owned by Arachnet Project z.s. ANTHEA is the parallel theoretical project.
 
-The project is governed by `docs/dev_workflow.md` and the two control documents `docs/project_summary.md` and `docs/todo.md`. Phase 0 remains in progress. The interrupted Step 0.6 `--real-db` design work remains the next engineering priority after this post-workshop documentation close-out.
+The repository plan is governed by docs/dev_workflow.md and docs/todo.md. Step 0.6 remains in progress. D1 is complete; D2 and the remaining Step 0.6 work remain open.
 
-## Scope of this update
+## Scope of this summary
 
-This update records the completed SNOMED CT vocabulary work, the outcome of the UZIS workshop on 2026-11-23, and the agreed return to Phase 0 engineering after the post-workshop control-document close-out.
+This summary records the 2026-11-28 D1 bootstrap implementation session and its verification on Ubuntu and OCI Frankfurt.
+
+## State inherited at the start of the work
+
+The last reported Ubuntu repository check before D1 implementation was /home/jan/project_embeddings on main at 2c54008, clean and aligned with origin/main. The post-workshop control-document close-out was committed and pushed in that commit.
 
 ## Work completed
 
-### SNOMED CT vocabulary
+### D1 — Bootstrap mode selection
 
-`docs/snomed_vocabulary.md` was updated from version 0.4 to version 0.5, dated 2026-11-17. It contains the reviewed glossary entries for SNOMED CT concepts, descriptions, expressions, relationships, reference sets, and the Machine Readable Concept Model (MRCM).
+scripts/bootstrap.sh v1.11 and tests/test_bootstrap_r4_py.py v1.4 implement the agreed D1 behavior. Local mode is selected by default and does not change when TNS_ADMIN is set. The summary reports the selected command-line mode. Until D2 is implemented, --real-db fails immediately with the agreed diagnostic and exit status, before any local checks run. Argument handling follows the agreed help precedence, duplicate-flag, and unknown-argument rules.
 
-Jan approved the vocabulary changes, including the flat entry structure with the previous broad section headings removed. The repository now reports HEAD `584045f2ca8dd9fc172ff9ef7eca1d235281780e`, with commit message `docs: update SNOMED vocabulary for UZIS workshop`. The 2026-11-24 repository check showed a clean working tree on `main`, aligned with `origin/main`.
+The two D1 files were committed and pushed from Ubuntu:
 
-### UZIS workshop
+    4bc5823 fix: align bootstrap modes and argument handling
 
-Jan attended the UZIS workshop “Implementace SNOMED CT” on 2026-11-23. He could not pose his prepared questions during the session because VoiceOver was turned off so as not to disturb the presentation, and he therefore could not enter the questions in the Teams chat.
+The todo was updated to version 2.9 dated 2026-11-28 with the D1 decision amendments and work unit. The close-out update advances it to version 2.10 and records the D1 verification, the D2 next steps, and the deferred workflow review. It is part of the separate docs close-out commit.
 
-A SNOMED International representative invited follow-up contact. The representative also mentioned user groups, but it was not clear whether the relevant group already exists or is still planned. Jan intends to ask MUDr. Irena Molinari at UZIS for the appropriate SNOMED International contact and clarification.
+## Decisions approved
 
-The workshop raised questions about storing SNOMED CT release content in a database and automating the release-ingestion process. The exact process discussed was not confirmed. ACE’s Phase 1 planning should clarify supported release checking and downloads, the Oracle import and storage design, and any applicable licensing conditions before commercial use.
+- D1 is an independent work unit, completed before the remaining --real-db design decisions.
+- The D1 commit prefix is fix:.
+- The unresolved status and prefix relationship of docs/git_workflow.md will be reviewed in the ARC project after Phase 0.
+- After Phase 0, Jan plans to revise the ACE development workflow as a whole for planned use of agents and ARC aliases.sh. The current approved workflow remains in force until a revision is reviewed and approved.
 
-## Decisions and current direction
+## Verification performed
 
-* The UZIS vocabulary update is completed and recorded in `docs/snomed_vocabulary.md`; its material outcome is preserved in this summary.
-* The post-workshop follow-up is recorded in `docs/todo.md`. No response from UZIS or SNOMED International has yet been recorded.
-* Phase 0 remains the immediate engineering priority. The workshop follow-up and Phase 1 ingestion questions do not expand Step 0.6 or block its completion.
-* Phase 1 planning must address loading RF2 release content into ACE’s queryable Oracle store. RF2 is the release distribution input; the detailed automated ingestion process remains to be designed and verified.
-* No code or tests were changed or run as part of the post-workshop documentation work.
+Round 4 passed on Ubuntu: reported result 15/15. The pasted Ubuntu output did not include the command line.
 
-## Repository state
+On OCI Frankfurt, after pulling 4bc5823, Jan ran:
 
-At the 2026-11-24 check, the repository was `/home/jan/project_embeddings` on Ubuntu, branch `main`, at:
+    python3 tests/test_bootstrap_r4_py.py
 
-    584045f2ca8dd9fc172ff9ef7eca1d235281780e
+The test reported 15/15 passed in the wenv environment. The pull was a fast-forward from 584045f to 4bc5823 and reported no conflicts.
 
-The working tree was clean, and `main` was aligned with `origin/main`. This status was checked before the post-workshop control-document edits in this summary and `docs/todo.md`.
+These runs verify the Round 4 bootstrap suite on the two machines. They do not verify real Oracle connectivity. The --real-db behavior remains an interim rejection until D2 is implemented.
 
-## Unresolved work
+## Repository state at close-out preparation
 
-The following remain recorded in `docs/todo.md`:
+After the D1 push, Ubuntu reported main aligned with origin/main at 4bc5823, with docs/todo.md modified and uncommitted. This predates the final control-document updates. Obtain fresh Ubuntu status, recent history, and HEAD/origin/main relationship before finalizing close-out. Record any preserved working-tree changes explicitly.
 
-* Finish the `--real-db` design and implementation work for Step 0.6.
-* Resolve the OCI Python environment discrepancy and the Oracle Thin-mode/NNE question.
-* Review the available Step 0.5 real-Oracle verification evidence.
-* Prepare and send the UZIS follow-up email, then record any confirmed contact, user-group, or implementation guidance.
-* Plan Phase 1 SNOMED CT release ingestion, Oracle storage, supported automation, and applicable licensing.
+## Unresolved issues and pending work
+
+- D2 and its prerequisite decisions remain open: A, B, C, D3, D4, D5, D6, D7, and D8 as recorded in docs/todo.md §2.2.4.
+- Step 0.6 environment-summary coverage and the bootstrap verification protocol remain pending after D2.
+- Real-schema verification remains blocked pending Phase 1 schema provisioning and the applicable network-encryption decision.
+- Step 0.7 and Phase 0 close-out evidence remain pending.
+- The docs/git_workflow.md status and the broader ACE workflow revision are deferred until after Phase 0, as recorded in docs/todo.md §6.10.
 
 ## Immediate next step
 
-Review the updated `docs/project_summary.md` and `docs/todo.md` against the development workflow and repository state. Then commit and push the approved control-document changes from Ubuntu and verify the resulting repository state. After this close-out, open a separate engineering session and resume the `--real-db` design in `docs/todo.md` §2.2.
+Complete the control-document close-out from Ubuntu: update and review docs/todo.md and this summary against live repository state, commit and push the control documents, and verify the final repository state. Then open the next work session for D2 and its unresolved prerequisites. Do not mark Step 0.6 complete.
