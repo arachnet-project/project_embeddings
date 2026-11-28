@@ -5,7 +5,12 @@
 # Does NOT invoke pipeline scripts.
 #
 # Usage:
-#   bash scripts/bootstrap.sh [-h|--help]
+#   bash scripts/bootstrap.sh [--real-db] [-h|--help]
+#
+# Modes (selected only by the command line, never by the environment):
+#   local    — default. Local prerequisite checks only.
+#   real-db  — --real-db. Not yet implemented (Step 0.6, D2): currently
+#              fails with exit 1 before any check runs.
 #
 # Environment variables:
 #   PROJECT_ROOT — absolute path to project root. Optional.
@@ -14,8 +19,8 @@
 #
 # Target platforms: Oracle Linux 9, Ubuntu. Unix/Linux only.
 # Author:  Jan Mura
-# Version: 1.10
-# Last modified: 2026-09-19
+# Version: 1.11
+# Last modified: 2026-11-28
 # =============================================================================
 set -euo pipefail
 export LC_ALL=C.UTF-8
@@ -32,11 +37,18 @@ export LC_ALL=C.UTF-8
 # TEMP_FILES     — registered temporary files for EXIT-trap cleanup
 #                  (populated by check_python_modules and
 #                  check_required_dirs, consumed by cleanup_temp_files).
+# BOOTSTRAP_MODE — selected bootstrap mode, "local" or "real-db" (set by
+#                  main from the command-line arguments only, read by
+#                  print_environment_summary). It is initialized here,
+#                  so a value inherited from the environment is ignored.
+#                  It is never derived from TNS_ADMIN or any other
+#                  environment variable.
 resolved_venv=""
 PYTHON=""
 RESOLVED_ROOT=""
 PYTHON_VERSION=""
 TEMP_FILES=()
+BOOTSTRAP_MODE="local"
 
 # ---------------------------------------------------------------------------
 # Functions
@@ -44,15 +56,31 @@ TEMP_FILES=()
 
 # --- print_usage ---
 print_usage() {
-    # Print usage information to stdout.
+    # Print usage information to stdout. Callers reporting an argument
+    # error redirect it to stderr.
     cat << 'USAGE'
-Usage: bash scripts/bootstrap.sh [-h|--help]
+Usage: bash scripts/bootstrap.sh [--real-db] [-h|--help]
 
 Prerequisite gate for Arachnet Clinical Embeddings. Checks that the
 environment is ready before any work begins. Does NOT invoke pipeline
 scripts.
 
-Checks performed (in order):
+Modes:
+  local     Default when --real-db is not given. Verifies local
+            prerequisites only. Does not require Oracle connectivity,
+            TNS_ADMIN, application-schema passwords, or SYSDBA
+            credentials.
+  real-db   Selected with --real-db. Intended to run the local checks,
+            then verify connectivity to the snomed and snomed_stage
+            application schemas. Not yet implemented: currently fails
+            with exit 1 before any check runs.
+
+Options:
+  --real-db   Select real-db mode. May be given at most once.
+  -h, --help  Print this help and exit 0. Takes precedence over all
+              other arguments.
+
+Checks performed in local mode (in order):
   1. Resolve PROJECT_ROOT (auto-detect or override)
   2. Verify virtual environment is active and inside PROJECT_ROOT
   3. Verify python3 resolves to the active venv Python
@@ -68,20 +96,20 @@ Environment variables:
                     point to a directory inside PROJECT_ROOT.
   SNOMED_LOG_DIR    Required. Directory for log output.
   SNOMED_LOG_LEVEL  Required. Logging verbosity level.
-  TNS_ADMIN         Optional. Presence signals an OCI/production
-                    environment. If set, also requires:
-                      SNOMED_DB_PASSWORD
-                      SNOMED_STAGE_DB_PASSWORD
+  TNS_ADMIN         Not used in local mode; setting it does not change
+                    the checks performed. Real-db mode will require it,
+                    together with the application-schema password
+                    variables named in config/database.yaml.
 
 Notes:
-  This is a local prerequisite gate only. It does not verify Oracle
-  connectivity or schema reachability — a --real-db mode for that
-  purpose is planned but not yet implemented (see docs/todo.md).
+  The mode is selected only by the command line. Environment
+  variables never change the mode.
   A Python version below 3.12 produces a warning, not a failure.
 
 Exit codes:
-  0  All checks passed.
-  1  A check failed. Message identifies what and why.
+  0  All checks requested by the selected mode passed.
+  1  A check failed, an argument was invalid, or --real-db was
+     requested (not yet implemented). The message identifies why.
 
 Examples:
   bash scripts/bootstrap.sh
@@ -415,9 +443,11 @@ sys.exit(0)
 # --- check_env_vars ---
 check_env_vars() {
     # Verify required environment variables are set and non-empty.
-    # Always checks: SNOMED_LOG_DIR, SNOMED_LOG_LEVEL.
-    # If TNS_ADMIN is set (OCI), also checks: TNS_ADMIN,
-    # SNOMED_DB_PASSWORD, SNOMED_STAGE_DB_PASSWORD.
+    # Checks: SNOMED_LOG_DIR, SNOMED_LOG_LEVEL.
+    # Does not check TNS_ADMIN or the application-schema passwords,
+    # whether or not TNS_ADMIN is set: local mode must not require
+    # them (docs/phase0_foundation.md, Step 0.6). They are real-db
+    # prerequisites (docs/todo.md §2.2, D1 and D2).
     # Accumulates all failures before reporting — missing vars are
     # independent and knowing all of them at once is more useful than
     # stopping at the first.
@@ -450,23 +480,6 @@ check_env_vars() {
             echo "  OK       ${var}"
         fi
     done
-
-    # OCI path: TNS_ADMIN presence signals production environment.
-    if [[ -n "${TNS_ADMIN:-}" ]]; then
-        local oci_required=(
-            "TNS_ADMIN"
-            "SNOMED_DB_PASSWORD"
-            "SNOMED_STAGE_DB_PASSWORD"
-        )
-        for var in "${oci_required[@]}"; do
-            if [[ -z "${!var:-}" ]]; then
-                echo "  MISSING  ${var}"
-                missing+=("${var}")
-            else
-                echo "  OK       ${var}"
-            fi
-        done
-    fi
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
         echo "" >&2
@@ -650,22 +663,16 @@ print_environment_summary() {
     # check function exits immediately on failure, so reaching this
     # point means all listed results are OK.
     #
-    # Mode is derived from the same TNS_ADMIN condition check_env_vars
-    # uses to decide whether OCI credential checks apply — the two
-    # must never disagree about which mode was actually checked. A
-    # separate global mode variable is deliberately not introduced;
-    # TNS_ADMIN itself remains the single source of truth for mode.
+    # The mode line reports BOOTSTRAP_MODE, the mode selected on the
+    # command line, which is the single source of truth for which
+    # checks ran. TNS_ADMIN does not affect it.
     echo ""
     echo "=== Environment summary ==="
     echo "Project root: ${RESOLVED_ROOT}"
     echo "Virtual environment: ${resolved_venv}"
     echo "Python executable: ${PYTHON}"
     echo "Python version: ${PYTHON_VERSION}"
-    if [[ -n "${TNS_ADMIN:-}" ]]; then
-        echo "Mode: OCI/production"
-    else
-        echo "Mode: local"
-    fi
+    echo "Mode: ${BOOTSTRAP_MODE}"
     echo "Check results:"
     echo "  Project root: OK"
     echo "  Virtual environment: OK"
@@ -682,21 +689,63 @@ print_environment_summary() {
 
 # --- main ---
 main() {
+    # Parse all arguments before any check runs, then apply them in
+    # this order (docs/todo.md §2.2, D1 amendments 2, 3 and 7):
+    #   1. -h or --help anywhere: print usage to stdout, exit 0.
+    #   2. Any unknown argument: report each, usage to stderr, exit 1.
+    #   3. --real-db given more than once: usage to stderr, exit 1.
+    #   4. --real-db given once: select real-db mode.
+    # Until D2 is implemented, real-db mode fails immediately with
+    # exit 1, before any check runs, so that a local-only pass can
+    # never be mistaken for a real-database pass.
     local arg
+    local help_requested=0
+    local real_db_count=0
+    local unknown_args=()
 
     for arg in "$@"; do
         case "${arg}" in
             -h|--help)
-                print_usage
-                exit 0
+                help_requested=1
+                ;;
+            --real-db)
+                real_db_count=$((real_db_count + 1))
                 ;;
             *)
-                echo "bootstrap: unknown argument: ${arg}" >&2
-                echo "bootstrap: use -h or --help for usage." >&2
-                exit 1
+                unknown_args+=("${arg}")
                 ;;
         esac
     done
+
+    if [[ "${help_requested}" -eq 1 ]]; then
+        print_usage
+        exit 0
+    fi
+
+    if [[ "${#unknown_args[@]}" -gt 0 ]]; then
+        for arg in "${unknown_args[@]}"; do
+            echo "bootstrap: unknown argument: ${arg}" >&2
+        done
+        echo "" >&2
+        print_usage >&2
+        exit 1
+    fi
+
+    if [[ "${real_db_count}" -gt 1 ]]; then
+        echo "bootstrap: --real-db given more than once." >&2
+        echo "" >&2
+        print_usage >&2
+        exit 1
+    fi
+
+    if [[ "${real_db_count}" -eq 1 ]]; then
+        BOOTSTRAP_MODE="real-db"
+    fi
+
+    if [[ "${BOOTSTRAP_MODE}" == "real-db" ]]; then
+        echo "bootstrap: --real-db is not implemented yet (Step 0.6, D2)." >&2
+        exit 1
+    fi
 
     trap cleanup_temp_files EXIT
 
